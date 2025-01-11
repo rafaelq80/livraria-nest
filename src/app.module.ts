@@ -4,6 +4,10 @@ import { ProdutoModule } from './produto/produto.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Produto } from './produto/entities/produto.entity';
 import { Autor } from './autor/entities/autor.entity';
+import { Categoria } from './categoria/entities/categoria.entity';
+import { Editora } from './editora/entities/editora.entity';
+import { CategoriaModule } from './categoria/categoria.module';
+import { EditoraModule } from './editora/editora.module';
 
 @Module({
   imports: [
@@ -14,12 +18,14 @@ import { Autor } from './autor/entities/autor.entity';
       username: 'root',
       password: 'root',
       database: 'db_livraria',
-      entities: [Produto, Autor],
+      entities: [Produto, Autor, Categoria, Editora],
       synchronize: true,
       //logging: true,
     }),
     ProdutoModule,
     AutorModule,
+    CategoriaModule,
+    EditoraModule,
   ],
   controllers: [],
   providers: [],

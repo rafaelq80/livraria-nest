@@ -1,103 +1,122 @@
+import { EditoraService } from './../../editora/services/editora.service';
+import { CategoriaService } from './../../categoria/services/categoria.service';
 import { AutorService } from './../../autor/services/autor.service';
-import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Produto } from "../entities/produto.entity";
-import { DeleteResult, ILike, Repository } from "typeorm";
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Produto } from '../entities/produto.entity';
+import { DeleteResult, ILike, Repository } from 'typeorm';
 
 @Injectable()
-export class ProdutoService{
-    constructor(
-        @InjectRepository(Produto)
-        private produtoRepository: Repository<Produto>,
-        private autorService: AutorService
-    ){}
+export class ProdutoService {
+  constructor(
+    @InjectRepository(Produto)
+    private produtoRepository: Repository<Produto>,
+    private autorService: AutorService,
+    private categoriaService: CategoriaService,
+    private editoraService: EditoraService,
+  ) {}
 
-    async findAll(): Promise<Produto[]>{
-        return await this.produtoRepository.find({
-            relations: {
-                autores: true
-            }
-        });
+  async findAll(): Promise<Produto[]> {
+    return await this.produtoRepository.find({
+      relations: {
+        autores: true,
+        categoria: true,
+        editora: true,
+      },
+      order: {
+        titulo: 'ASC',
+      },
+      cache: true,
+    });
+  }
 
-    }
+  async findById(id: number): Promise<Produto> {
+    if (id <= 0)
+      throw new HttpException('Id inválido!', HttpStatus.BAD_REQUEST);
 
-    async findById(id: number): Promise<Produto> {
+    const produto = await this.produtoRepository.findOne({
+      where: {
+        id,
+      },
+      relations: {
+        autores: true,
+        categoria: true,
+        editora: true,
+      },
+    });
 
-        let produto = await this.produtoRepository.findOne({
-            where:{
-                id
-            },
-            relations: {
-                autores: true
-            }
-        });
+    if (!produto)
+      throw new HttpException('Produto não encontrado!', HttpStatus.NOT_FOUND);
 
-        if (!produto)
-            throw new HttpException('Produto não encontrado!', HttpStatus.NOT_FOUND);
+    return produto;
+  }
 
-        return produto;
+  async findByTitulo(titulo: string): Promise<Produto[]> {
+    return await this.produtoRepository.find({
+      where: {
+        titulo: ILike(`%${titulo.trim()}%`),
+      },
+      relations: {
+        autores: true,
+        categoria: true,
+        editora: true,
+      },
+      order: {
+        titulo: 'ASC',
+      },
+    });
+  }
 
-    }
-
-    async findByTitulo(titulo: string): Promise<Produto[]>{
-        return await this.produtoRepository.find({
-            where:{
-                titulo: ILike(`%${titulo}%`)
-            },
-            relations: {
-                autores: true
-            }
-        })
-
-    }
-
-    async create(produto: Produto): Promise<Produto> {
-        
-        if (produto.autores) {
-
-            for (const autor of produto.autores) {
-                const buscaAutor = await this.autorService.findById(autor.id);
-                if (!buscaAutor) {
-                    throw new HttpException('Autor não foi encontrado!', HttpStatus.NOT_FOUND);
-                }
-            }
-
-        }
+  async create(produto: Produto): Promise<Produto> {
     
-        return await this.produtoRepository.save(produto);
-    }
+    await this.validateAutores(produto.autores);
     
-    async update(produto: Produto): Promise<Produto>{
-        
-        let buscaProduto: Produto = await this.findById(produto.id);
+    await this.categoriaService.findById(produto.categoria.id);
+    await this.editoraService.findById(produto.editora.id);
 
-        if (!buscaProduto || !produto.id)
-            throw new HttpException('Produto não foi encontrado!', HttpStatus.NOT_FOUND)
+    return await this.produtoRepository.save(produto);
+  }
 
-        if (produto.autores) {
+  async update(produto: Produto): Promise<Produto> {
+    if (!produto || !produto.id)
+      throw new HttpException('Produto inválido!', HttpStatus.BAD_REQUEST);
 
-            for (const autor of produto.autores) {
-                const buscaAutor = await this.autorService.findById(autor.id);
-                if (!buscaAutor) {
-                    throw new HttpException('Autor não foi encontrado!', HttpStatus.NOT_FOUND);
-                }
-            }
-            
-        }
+    await this.findById(produto.id);
 
-        return await this.produtoRepository.save(produto);
+    await this.validateAutores(produto.autores);
 
+    await this.categoriaService.findById(produto.categoria.id);
+    await this.editoraService.findById(produto.editora.id);
+
+    return await this.produtoRepository.save(produto);
+  }
+
+  async delete(id: number): Promise<DeleteResult> {
+    if (id <= 0)
+      throw new HttpException('Id inválido!', HttpStatus.BAD_REQUEST);
+
+    await this.findById(id);
+
+    return await this.produtoRepository.delete(id);
+  }
+
+  private async validateAutores(autores: any[]): Promise<void> {
+    if (!autores || !Array.isArray(autores)) {
+      throw new HttpException(
+        'Lista de autores inválida',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
-    async delete(id: number): Promise<DeleteResult>{
-        
-        let buscaProduto: Produto = await this.findById(id);
-        
-        if (!buscaProduto)
-            throw new HttpException('Produto não foi encontrado!', HttpStatus.NOT_FOUND)
-
-        return await this.produtoRepository.delete(id);
-        
+    for (const autor of autores) {
+      try {
+        await this.autorService.findById(autor.id);
+      } catch (error) {
+        throw new HttpException(
+          `Autor com ID ${autor.id} não encontrado`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
     }
-
+  }
 }

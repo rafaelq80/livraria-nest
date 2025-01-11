@@ -3,12 +3,16 @@ import { IsNotEmpty, IsNumber } from 'class-validator';
 import {
   Column,
   Entity,
+  JoinColumn,
   JoinTable,
   ManyToMany,
+  ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Autor } from '../../autor/entities/autor.entity';
 import { IsISBN } from '../../utils/validators/isisbn.validator';
+import { Categoria } from '../../categoria/entities/categoria.entity';
+import { Editora } from '../../editora/entities/editora.entity';
 
 @Entity('tb_produtos')
 export class Produto {
@@ -43,4 +47,16 @@ export class Produto {
     inverseJoinColumn: { name: 'autor_id', referencedColumnName: 'id' },
   })
   autores: Autor[];
+
+  @ManyToOne(() => Categoria, (categoria) => categoria.produto, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'categoria_id' }) 
+  categoria: Categoria;
+
+  @ManyToOne(() => Editora, (editora) => editora.produto, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'editora_id' }) 
+  editora: Editora;
 }

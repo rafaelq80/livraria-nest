@@ -1,7 +1,7 @@
-import { Column, Entity, PrimaryGeneratedColumn, ManyToMany } from 'typeorm';
 import { Transform, TransformFnParams } from 'class-transformer';
-import { Produto } from '../../produto/entities/produto.entity';
 import { IsNotEmpty } from 'class-validator';
+import { Column, Entity, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Produto } from '../../produto/entities/produto.entity';
 
 @Entity('tb_autores')
 export class Autor {
