@@ -10,7 +10,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Autor } from '../../autor/entities/autor.entity';
-import { IsISBN } from '../../utils/validators/isisbn.validator';
+import { IsISBN } from '../../util/validators/isisbn.validator';
 import { Categoria } from '../../categoria/entities/categoria.entity';
 import { Editora } from '../../editora/entities/editora.entity';
 

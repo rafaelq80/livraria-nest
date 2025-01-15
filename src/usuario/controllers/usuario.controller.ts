@@ -1,8 +1,7 @@
-﻿import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Put, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
-import { UsuarioService } from "../services/usuario.service";
-import { Usuario } from "../entities/usuario.entity";
-import { FileInterceptor } from "@nestjs/platform-express";
+﻿import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Put, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../../security/guard/jwt-auth.guard";
+import { Usuario } from "../entities/usuario.entity";
+import { UsuarioService } from "../services/usuario.service";
 
 @Controller("/usuarios")
 export class UsuarioController{

@@ -1,76 +1,72 @@
-﻿import { JwtService } from '@nestjs/jwt';
-import { UsuarioService } from '../../usuario/services/usuario.service';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { Bcrypt } from '../bcrypt/bcrypt';
-import { UsuarioLogin } from '../entities/usuariologin.entity';
+﻿import { JwtService } from "@nestjs/jwt"
+import { UsuarioService } from "../../usuario/services/usuario.service"
+import { HttpException, HttpStatus, Injectable } from "@nestjs/common"
+import { Bcrypt } from "../bcrypt/bcrypt"
+import { UsuarioLogin } from "../types/usuariologin"
 
 @Injectable()
 export class SecurityService {
-  constructor(
-    private usuarioService: UsuarioService,
-    private jwtService: JwtService,
-    private bcrypt: Bcrypt,
-  ) {}
+	constructor(
+		private readonly usuarioService: UsuarioService,
+		private readonly jwtService: JwtService,
+		private readonly bcrypt: Bcrypt,
+	) {}
 
-  async validateUser(username: string, password: string,): Promise<Omit<any, 'senha'> | null> {
-    try {
-      if (!username || !password) {
-        throw new HttpException(
-          'Usuário e Senha são Obrigatórios!',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+	async validateUser(usuario: string, senha: string): Promise<Omit<UsuarioAutenticado, "token">> {
+		
+        this.validarCredenciais(usuario, senha)
+		
+        const [usuarioNormalizado, senhaNormalizada] = this.sanitizarCredenciais(usuario, senha)
 
-      const buscaUsuario = await this.usuarioService.findByUsuario(username);
+		const buscaUsuario = await this.usuarioService.findByUsuario(usuarioNormalizado)
+		
+        if (!buscaUsuario) 
+			throw new HttpException("Usuário não encontrado!", HttpStatus.NOT_FOUND)
 
-      if (!buscaUsuario)
-        throw new HttpException(
-          'Usuário não encontrado!',
-          HttpStatus.NOT_FOUND,
-        );
+		const validarSenha = await this.bcrypt.compararSenhas(senhaNormalizada, buscaUsuario.senha)
+		
+        if (!validarSenha)
+			throw new HttpException("Senha incorreta!", HttpStatus.UNAUTHORIZED)
 
-      const validaSenha = await this.bcrypt.compararSenhas(
-        password,
-        buscaUsuario.senha,
-      );
+		const { senha: _, ...dadosUsuario } = buscaUsuario
 
-      if (!validaSenha)
-        throw new HttpException('Senha incorreta!', HttpStatus.UNAUTHORIZED);
+		return dadosUsuario
+	}
 
-      const { senha, ...dadosUsuario } = buscaUsuario;
+	async login(usuarioLogin: UsuarioLogin): Promise<UsuarioAutenticado> {
+		
+        const usuarioNormalizado = usuarioLogin.usuario.trim().toLowerCase()
 
-      return dadosUsuario;
+		const buscaUsuario = await this.usuarioService.findByUsuario(usuarioNormalizado)
 
-    } catch (error: any) {
-      return null;
-    }
-  }
+		if (!buscaUsuario) {
+			throw new HttpException("Usuário inválido!", HttpStatus.NOT_FOUND)
+		}
 
-  async login(usuarioLogin: UsuarioLogin): Promise<UsuarioAutenticado> {
-    try {
+		const token = this.gerarToken(usuarioNormalizado)
 
-        const buscaUsuario = await this.usuarioService.findByUsuario(
-            usuarioLogin.usuario,
-        );
+		return {
+			id: buscaUsuario.id,
+			nome: buscaUsuario.nome,
+			usuario: usuarioLogin.usuario,
+			foto: buscaUsuario.foto,
+			token,
+		}
+	}
 
-        const payload: JwtPayload = {
-            sub: usuarioLogin.usuario
-        };
+	private validarCredenciais(usuario: string, senha: string): void {
+		if (!usuario?.trim() || !senha?.trim()) {
+			throw new HttpException("Usuário e Senha são Obrigatórios!", HttpStatus.BAD_REQUEST)
+		}
+	}
 
-        return {
-            id: buscaUsuario.id,
-            nome: buscaUsuario.nome,
-            usuario: usuarioLogin.usuario,
-            foto: buscaUsuario.foto,
-            token: `Bearer ${this.jwtService.sign(payload)}`,
-        };
+	private sanitizarCredenciais(usuario: string, senha: string): [string, string] {
+		return [usuario.trim().toLowerCase(), senha.trim()]
+	}
 
-    } catch (error: any) {
-        console.log(error)
-        throw new HttpException(
-            'Erro ao efetuar login',
-            HttpStatus.INTERNAL_SERVER_ERROR
-        );
-    }
-  }
+	private gerarToken(usuario: string): string {
+		const payload: JwtPayload = { sub: usuario }
+		return `Bearer ${this.jwtService.sign(payload)}`
+	}
+
 }
