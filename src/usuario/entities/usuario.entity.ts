@@ -5,7 +5,8 @@ import {
   IsNotEmpty,
   MinLength
 } from 'class-validator';
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinTable, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Role } from '../../role/entities/role.entity';
 
 @Entity({ name: 'tb_usuarios' })
 export class Usuario {
@@ -32,5 +33,13 @@ export class Usuario {
 
   @Column({ type: 'varchar', length: 5000, nullable: true })
   foto?: string;
+
+  @ManyToMany(() => Role, (roles) => roles.usuarios)
+    @JoinTable({
+      name: 'tb_usuarios_roles',
+      joinColumn: { name: 'usuario_id', referencedColumnName: 'id' },
+      inverseJoinColumn: { name: 'role_id', referencedColumnName: 'id' },
+    })
+    roles: Role[];
 
 }

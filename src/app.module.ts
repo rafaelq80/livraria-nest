@@ -8,6 +8,7 @@ import { EditoraModule } from './editora/editora.module';
 import { ProdutoModule } from './produto/produto.module';
 import { SecurityModule } from './security/security.module';
 import { UsuarioModule } from './usuario/usuario.module';
+import { RoleModule } from './role/role.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UsuarioModule } from './usuario/usuario.module';
     EditoraModule,
     UsuarioModule,
     SecurityModule,
+    RoleModule,
   ],
   controllers: [],
   providers: [],

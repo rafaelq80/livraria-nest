@@ -1,5 +1,5 @@
 ﻿import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
-import { LocalAuthGuard } from '../guard/local-auth.guard';
+import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { SecurityService } from '../services/security.service';
 import { UsuarioLogin } from '../types/usuariologin';
 
@@ -10,7 +10,7 @@ export class SecurityController {
     @UseGuards(LocalAuthGuard)
     @HttpCode(HttpStatus.OK)
     @Post('/logar')
-    async login(@Body() user: UsuarioLogin): Promise<any> {
+    login(@Body() user: UsuarioLogin): Promise<any> {
         return this.securityService.login(user);
     }
 

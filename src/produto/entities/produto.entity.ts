@@ -13,6 +13,7 @@ import { Autor } from '../../autor/entities/autor.entity';
 import { IsISBN } from '../../util/validators/isisbn.validator';
 import { Categoria } from '../../categoria/entities/categoria.entity';
 import { Editora } from '../../editora/entities/editora.entity';
+import { NumericTransformer } from '../../util/numerictransformer';
 
 @Entity('tb_produtos')
 export class Produto {
@@ -26,7 +27,7 @@ export class Produto {
 
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsNotEmpty()
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, transformer: new NumericTransformer() })
   preco: number;
 
   @Column({ length: 5000 })
