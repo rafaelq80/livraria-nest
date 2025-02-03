@@ -1,99 +1,230 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Projeto Livraria - Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+<br />
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+<div align="center">
+    <img src="https://i.imgur.com/icgjsRQ.png" title="source: imgur.com" width="50%"/>
+</div>
 
-## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+<br /><br />
 
-## Project setup
+## 1. Descrição
 
-```bash
-$ npm install
+O **Projeto Livraria** é uma **API REST** desenvolvida com **NestJS**, voltada para a gestão de uma livraria online. O sistema permite o gerenciamento de **produtos (livros), autores, editoras, categorias, usuários e permissões (roles)**.
+
+A aplicação foi projetada para oferecer uma plataforma segura e eficiente para administração de catálogos de livros e gestão de usuários. O projeto possui integração com um frontend web e, futuramente, um aplicativo mobile para melhorar a experiência de compra e navegação.
+
+<br />
+
+### 1.1. Funcionalidades Principais:
+
+1. Um catálogo de livros disponíveis
+2. Funcionalidade de busca e filtragem de opções
+3. Sistema de pedidos e pagamentos online
+4. Rastreamento de entrega
+5. Avaliações e feedback dos usuários
+
+------
+
+## 2. Sobre esta API
+
+Esta API foi desenvolvida utilizando **NestJS** para criar a estrutura básica de um sistema de livraria. Ela fornece endpoints para gerenciar usuários (e suas permissões), produtos, autores, editoras e categorias.
+
+<br />
+
+### 2.1. Principais Funcionalidades
+
+1. **Gerenciamento de Produtos**: Cadastro, leitura, atualização e exclusão de livros, com informações como título, preço, autor, editora e categoria.
+2. **Gerenciamento de Autores**: Cadastro de autores e seus livros, associando-os aos produtos.
+3. **Gerenciamento de Editoras**: Cadastro e vinculação de editoras aos produtos.
+4. **Gestão de Categorias**: Organize os produtos em diferentes categorias para facilitar a navegação.
+5. **Cadastro de Usuários**: Gerencie os perfis de clientes, com informações como nome, email e senha.
+6. **Sistema de Roles (Permissões)**: Controle de acesso baseado em papéis (roles) para definir quais usuários podem acessar ou modificar recursos específicos.
+7. **Autenticação com JWT**: Proteção de rotas com autenticação baseada em token JWT, garantindo a segurança e privacidade das informações.
+
+------
+
+## 3. Diagrama de Classes
+
+```mermaid
+classDiagram
+class Categoria {
+  - id : number
+  - tipo : string
+  - produto : []Produto
+  + findAll()
+  + findById(id : number)
+  + findAllByTipo(tipo : string)
+  + create(categoria : Categoria)
+  + update(categoria : Categoria)
+  + delete(id : number)
+}
+class Editora {
+  - id : number
+  - nome : string
+  - produto : []Produto
+  + findAll()
+  + findById(id : number)
+  + findByNome(nome : string)
+  + create(editora : Editora)
+  + update(editora : Editora)
+  + delete(id : number)
+}
+class Produto {
+  - id : number
+  - titulo : string
+  - preco : number
+  - foto : string
+  - autores : []Autor
+  - categoria : Categoria
+  - editora : Editora
+  + findAll()
+  + findById(id : number)
+  + findAllByTitulo(titulo : string)
+  + create(produto : Produto)
+  + update(produto : Produto)
+  + delete(id : number)
+}
+class Autor {
+  - id : number
+  - nome : string
+  - nacionalidade: string
+  - produtos : []Produto
+  + findAll()
+  + findById(id : number)
+  + findAllByNome(nome : string)
+  + create(autor : Autor)
+  + update(autor : Autor)
+  + delete(id : number)
+}
+class Usuario {
+  - id : number
+  - nome : string
+  - usuario : string
+  - senha : string
+  - foto : string
+  - roles : []Role
+  + findAll()
+  + findById(id : number)
+  + create(usuario : Usuario)
+  + update(usuario : Usuario)
+  + delete(id : number)
+  + autenticar(usuariologin : UsuarioLogin)
+}
+class Role {
+  - id : number
+  - nome : string
+  - usuarios : []Usuario
+  + findAll()
+  + findById(id : number)
+  + findAllByNome(nome : string)
+  + create(role : Role)
+  + update(role : Role)
+  + delete(id : number)
+}
+class UsuarioLogin{
+  - id : number
+  - nome : string
+  - usuario : string
+  - senha : string
+  - foto : string
+  - token : string
+}
+Categoria "1" <--> "*" Produto
+Autor "*" <--> "*" Produto
+Editora "1" <--> "*" Produto
+Role "*" <--> "*" Usuario
 ```
 
-## Compile and run the project
+------
+
+## 4. Diagrama Entidade-Relacionamento (DER)
+
+
+
+<div align="center">
+    <img src="https://i.imgur.com/VKs5jrJ.png" title="source: imgur.com" />
+</div>
+
+
+
+------
+
+## 5. Tecnologias utilizadas
+
+| Item                          | Descrição  |
+| ----------------------------- | ---------- |
+| **Servidor**                  | Node JS    |
+| **Linguagem de programação**  | TypeScript |
+| **Framework**                 | Nest JS    |
+| **ORM**                       | TypeORM    |
+| **Banco de dados Relacional** | MySQL      |
+
+------
+
+## 6. Configuração e Execução
+
+1. Clone o repositório:
+
+   ```
+   git clone https://github.com/usuario/livraria-backend.git
+   ```
+2. Acesse a pasta do projeto:
+
+   ```
+   cd livraria-backend
+   ```
+
+3. Instale as dependências:
+
+   ```
+   npm install
+   ```
+
+4. Crie o banco de dados `db_livraria` no MySQL
+
+5. Crie o arquivo `.env` na pasta raiz do projeto
+6. Configure a conexão com o banco de dados e a secret (chave de assinatura do token JWT), no arquivo `.env`, através das variáveis de ambiente abaixo:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+DATABASE_HOST=localhost
+DATABASE_PORT=3306
+DATABASE_USER=seu_usuario
+DATABASE_PASSWORD=sua_senha
+DATABASE_NAME=db_livraria
+JWT_SECRET=sua_chave_secreta
 ```
 
-## Run tests
+5. Execute a aplicação: `npm run start:dev`
 
-```bash
-# unit tests
-$ npm run test
+------
 
-# e2e tests
-$ npm run test:e2e
+## 7. Estrutura do Projeto
 
-# test coverage
-$ npm run test:cov
+A estrutura do projeto foi organizada da seguinte forma:
+
+```
+src/
+│
+├── autor/             # Módulo de Autores
+├── categoria/         # Módulo de Categorias
+├── data/              # Configurações do banco de dados
+├── editora/           # Módulo de Editoras
+├── produto/           # Módulo de Produtos
+├── role/              # Módulo de Roles
+├── security/          # Módulo de autenticação
+├── usuario/           # Módulo de Usuários
+├── util/              # Funções auxiliares (ex: cálculos, conversores, entre outros)
+└── app.module.ts      # Módulo principal da aplicação
+
 ```
 
-## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+------
 
-```bash
-$ npm install -g mau
-$ mau deploy
-```
+## 8. Implementações Futuras
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- [ ] **Avaliações de Produtos**: Implementar a função Curtir livros
+- [ ] **Envio de E-mail**: Implementar notificações por e-mail para os usuários (ex.: confirmação de cadastro).
