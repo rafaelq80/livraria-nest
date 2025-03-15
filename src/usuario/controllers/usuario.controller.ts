@@ -2,9 +2,10 @@
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard";
 import { Usuario } from "../entities/usuario.entity";
 import { UsuarioService } from "../services/usuario.service";
-import { Roles } from "../../security/decorators/roles.decorator";
-import { RolesAuthGuard } from "../../security/guards/roles-auth.guard";
+import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
 
+@ApiTags('Usuário')
+@ApiBearerAuth()
 @Controller("/usuarios")
 export class UsuarioController{
 

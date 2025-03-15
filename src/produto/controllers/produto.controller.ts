@@ -2,8 +2,10 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard";
 import { Produto } from "../entities/produto.entity";
 import { ProdutoService } from "../services/produto.service";
+import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
 
-
+@ApiTags('Produto')
+@ApiBearerAuth()
 @Controller("/produtos")
 export class ProdutoController{
 

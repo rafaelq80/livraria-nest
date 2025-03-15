@@ -16,13 +16,17 @@ import { RoleService } from "../services/role.service"
 import { Roles } from "../../security/decorators/roles.decorator"
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard"
 import { RolesAuthGuard } from "../../security/guards/roles-auth.guard"
+import { ApiTags, ApiBearerAuth } from "@nestjs/swagger"
 
+@ApiTags('Role')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesAuthGuard)
+@Roles("admin") // Somente admnistradores possuem acesso
 @Controller("/roles")
 export class RoleController {
+
 	constructor(private readonly roleService: RoleService) {}
 
-	@UseGuards(JwtAuthGuard, RolesAuthGuard)
-	@Roles("admin") // Somente admnistradores possuem acesso
 	@Get()
 	@HttpCode(HttpStatus.OK)
 	findAll(): Promise<Role[]> {

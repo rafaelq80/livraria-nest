@@ -2,7 +2,10 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { Editora } from "../entities/editora.entity";
 import { EditoraService } from "../services/editora.service";
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard";
+import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
 
+@ApiTags('Editora')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller("/editoras")
 export class EditoraController{

@@ -2,7 +2,10 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { Autor } from "../entities/autor.entity";
 import { AutorService } from "../services/autor.service";
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard";
+import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
 
+@ApiTags('Autor')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller("/autores")
 export class AutorController{

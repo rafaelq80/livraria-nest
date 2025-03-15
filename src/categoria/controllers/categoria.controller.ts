@@ -2,7 +2,10 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { Categoria } from "../entities/categoria.entity";
 import { CategoriaService } from "../services/categoria.service";
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard";
+import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
 
+@ApiTags('Categoria')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller("/categorias")
 export class CategoriaController{

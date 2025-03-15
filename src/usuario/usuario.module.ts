@@ -5,9 +5,10 @@ import { Usuario } from './entities/usuario.entity';
 import { UsuarioService } from './services/usuario.service';
 import { Bcrypt } from '../security/bcrypt/bcrypt';
 import { RoleModule } from '../role/role.module';
+import { SendmailModule } from '../sendmail/sendmail.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Usuario]), RoleModule], 
+  imports: [TypeOrmModule.forFeature([Usuario]), RoleModule, SendmailModule], 
   providers: [UsuarioService, Bcrypt],
   controllers: [UsuarioController],
   exports: [UsuarioService],

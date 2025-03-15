@@ -1,9 +1,10 @@
 ﻿import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Bcrypt } from '../../security/bcrypt/bcrypt';
-import { Usuario } from '../entities/usuario.entity';
 import { RoleService } from '../../role/services/role.service';
+import { Bcrypt } from '../../security/bcrypt/bcrypt';
+import { SendmailService } from '../../sendmail/service/sendmail.service';
+import { Usuario } from '../entities/usuario.entity';
 
 @Injectable()
 export class UsuarioService {
@@ -12,6 +13,7 @@ export class UsuarioService {
     private usuarioRepository: Repository<Usuario>,
     private readonly roleService: RoleService,
     private bcrypt: Bcrypt,
+    private sendmailService: SendmailService
   ) {}
 
   async findByUsuario(usuario: string): Promise<Usuario | undefined> {
@@ -55,7 +57,12 @@ export class UsuarioService {
 
     usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha);
 
-    return await this.usuarioRepository.save(usuario);
+    const saveUsuario = await this.usuarioRepository.save(usuario);
+
+    await this.sendmailService.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario);
+
+    return saveUsuario;
+
   }
 
   async update(usuario: Usuario): Promise<Usuario> {
@@ -76,6 +83,16 @@ export class UsuarioService {
     usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha);
 
     return await this.usuarioRepository.save(usuario);
+
+  }
+
+  async updateSenha(usuario: string, senha: string): Promise<Usuario> {
+    
+    const buscaUsuario = await this.findByUsuario(usuario);
+
+    buscaUsuario.senha = await this.bcrypt.criptografarSenha(senha);
+
+    return await this.usuarioRepository.save(buscaUsuario);
 
   }
 

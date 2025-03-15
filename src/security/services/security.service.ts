@@ -64,7 +64,7 @@ export class SecurityService {
 		return [usuario.trim().toLowerCase(), senha.trim()]
 	}
 
-	private gerarToken(usuario: string): string {
+	gerarToken(usuario: string): string {
 		const payload: JwtPayload = { sub: usuario }
 		return `Bearer ${this.jwtService.sign(payload)}`
 	}
