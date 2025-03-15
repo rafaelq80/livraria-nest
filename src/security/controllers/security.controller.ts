@@ -1,11 +1,11 @@
 ﻿import { BadRequestException, Body, Controller, HttpCode, HttpStatus, Patch, Post, UseGuards } from "@nestjs/common"
-import { LocalAuthGuard } from "../guards/local-auth.guard"
-import { SecurityService } from "../services/security.service"
-import { UsuarioLogin } from "../types/usuariologin"
-import { RecuperarSenhaService } from "../services/recuperarsenha.service"
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger"
 import { RecuperarSenhaDto } from "../dto/recuperarsenha.dto"
-import { EnviarEmailDto } from "../dto/enviaremail.dto"
-import { ApiTags, ApiBearerAuth } from "@nestjs/swagger"
+import { SendmailDto } from "../dto/sendmail.dto"
+import { UsuarioLoginDto } from "../dto/usuariologin.dto"
+import { LocalAuthGuard } from "../guards/local-auth.guard"
+import { RecuperarSenhaService } from "../services/recuperarsenha.service"
+import { SecurityService } from "../services/security.service"
 
 @ApiTags('Usuário')
 @ApiBearerAuth()
@@ -19,14 +19,14 @@ export class SecurityController {
 	@UseGuards(LocalAuthGuard)
 	@HttpCode(HttpStatus.OK)
 	@Post("/logar")
-	login(@Body() user: UsuarioLogin): Promise<any> {
-		return this.securityService.login(user)
+	login(@Body() usuario: UsuarioLoginDto): Promise<any> {
+		return this.securityService.login(usuario)
 	}
 
 	@Post("/recuperarsenha")
-	async requestRecovery(@Body() usuario: EnviarEmailDto) {
+	async requestRecovery(@Body() sendmailDto: SendmailDto) {
 		try {
-			await this.recuperarSenhaService.enviarEmail(usuario.usuario)
+			await this.recuperarSenhaService.enviarEmail(sendmailDto)
 			return {
 				message: "Se o e-mail existir em nossa base, um link de recuperação será enviado para o seu e-mail.",
 			}
@@ -44,6 +44,6 @@ export class SecurityController {
 			throw new BadRequestException("As senhas não coincidem")
 		}
 
-		return this.recuperarSenhaService.atualizarSenha(recuperarSenhaDto.token, recuperarSenhaDto.senha)
+		return this.recuperarSenhaService.atualizarSenha(recuperarSenhaDto)
 	}
 }

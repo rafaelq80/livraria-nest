@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common"
 import { JwtService } from "@nestjs/jwt"
-import { SendmailService } from "../../sendmail/service/sendmail.service"
+import { SendmailService } from "../../sendmail/services/sendmail.service"
 import { UsuarioService } from "../../usuario/services/usuario.service"
+import { RecuperarSenhaDto } from "../dto/recuperarsenha.dto"
+import { SendmailDto } from "../dto/sendmail.dto"
 import { SecurityService } from "./security.service"
 
 @Injectable()
@@ -14,9 +16,9 @@ export class RecuperarSenhaService {
 		private readonly sendmailService: SendmailService
 	) {}
 
-	async enviarEmail(usuario: string): Promise<void> {
+	async enviarEmail(sendmailDto: SendmailDto): Promise<void> {
 
-		const buscaUsuario = await this.usuarioService.findByUsuario(usuario)
+		const buscaUsuario = await this.usuarioService.findByUsuario(sendmailDto.usuario)
 
 		if (!buscaUsuario) {
 			// Simulamos o sucesso mesmo se o usuário não existir para evitar enumeração de e-mails
@@ -34,10 +36,10 @@ export class RecuperarSenhaService {
 		)
 	}
 
-	async atualizarSenha(token: string, novaSenha: string): Promise<{ message: string }> {
+	async atualizarSenha(recuperarSenhaDto: RecuperarSenhaDto): Promise<{ message: string }> {
 		try {
 			
-			const tokenSemBearer = token.replace("Bearer ", "");
+			const tokenSemBearer = recuperarSenhaDto.token.replace("Bearer ", "");
 
 			const decoded = this.jwtService.verify(tokenSemBearer)
 
@@ -47,7 +49,7 @@ export class RecuperarSenhaService {
 				throw new NotFoundException("Usuário não encontrado")
 			}
 
-			await this.usuarioService.updateSenha(decoded.sub, novaSenha)
+			await this.usuarioService.updateSenha(decoded.sub, recuperarSenhaDto.senha)
 
 			return { message: "Senha alterada com sucesso" }
 		} catch (error) {

@@ -1,8 +1,10 @@
-﻿import { JwtService } from "@nestjs/jwt"
+﻿import { HttpException, HttpStatus, Injectable } from "@nestjs/common"
+import { JwtService } from "@nestjs/jwt"
 import { UsuarioService } from "../../usuario/services/usuario.service"
-import { HttpException, HttpStatus, Injectable } from "@nestjs/common"
 import { Bcrypt } from "../bcrypt/bcrypt"
-import { UsuarioLogin } from "../types/usuariologin"
+import { UsuarioLoginDto } from "../dto/usuariologin.dto"
+import { UsuarioAutenticado } from "../types/usuarioautenticado"
+import { JwtPayload } from "../types/jwtpayload"
 
 @Injectable()
 export class SecurityService {
@@ -33,7 +35,7 @@ export class SecurityService {
 		return dadosUsuario
 	}
 
-	async login(usuarioLogin: UsuarioLogin): Promise<UsuarioAutenticado> {
+	async login(usuarioLogin: UsuarioLoginDto): Promise<UsuarioAutenticado> {
 		
         const usuarioNormalizado = usuarioLogin.usuario.trim().toLowerCase()
 

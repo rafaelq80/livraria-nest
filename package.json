@@ -22,6 +22,7 @@
   "dependencies": {
     "@emailjs/nodejs": "^5.0.2",
     "@nestjs-modules/mailer": "^1.6.1",
+    "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^11.0.11",
     "@nestjs/config": "^4.0.1",
     "@nestjs/core": "^11.0.11",
@@ -33,6 +34,7 @@
     "@types/bcrypt": "^5.0.2",
     "@types/nodemailer": "^6.4.17",
     "bcrypt": "^5.1.1",
+    "canvas": "^3.1.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "html-minifier": "^4.0.0",
@@ -56,6 +58,7 @@
     "@nestjs/testing": "^11.0.11",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
+    "@types/multer": "^1.4.12",
     "@types/node": "^22.13.10",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",

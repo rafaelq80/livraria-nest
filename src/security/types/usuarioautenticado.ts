@@ -1,4 +1,4 @@
-interface UsuarioAutenticado {
+export interface UsuarioAutenticado {
     id: number;
     nome: string;
     usuario: string;
