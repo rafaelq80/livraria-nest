@@ -199,7 +199,8 @@ export class ImageKitService {
         this.httpService.get(url, { responseType: 'arraybuffer' })
       );
       return Buffer.from(response.data);
-    } catch (error) {
+    }catch (error: unknown) {
+      console.error("Erro: ", error instanceof Error ? error.message : error);
       throw new HttpException('Erro ao baixar a imagem', HttpStatus.BAD_REQUEST);
     }
   }

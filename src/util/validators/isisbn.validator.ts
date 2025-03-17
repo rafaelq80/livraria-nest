@@ -3,7 +3,7 @@ import { isISBN } from 'validator';
 
 @ValidatorConstraint({ async: false })
 export class IsISBNConstraint implements ValidatorConstraintInterface {
-    validate(value: any) {
+    validate(value: string) {
         return typeof value === 'string' && (isISBN(value, 10) || isISBN(value, 13));
     }
 
@@ -13,7 +13,7 @@ export class IsISBNConstraint implements ValidatorConstraintInterface {
 }
 
 export function IsISBN(validationOptions?: ValidationOptions) {
-    return function (object: Object, propertyName: string) {
+    return function (object: object, propertyName: string) {
         registerDecorator({
             target: object.constructor,
             propertyName: propertyName,

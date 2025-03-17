@@ -19,7 +19,7 @@ export class SendmailService {
 			},
 		})
 
-		this.transporter.verify(function (error, success) {
+		this.transporter.verify(function (error) {
 			if (error) {
 				console.error("Erro na conexão com Mailtrap:", error)
 			} else {
@@ -51,7 +51,7 @@ export class SendmailService {
 
 	async sendmailRecuperarSenha(nome: string, usuario: string, resetLink: string): Promise<void> {
 		try {
-			const info = await this.transporter.sendMail({
+			await this.transporter.sendMail({
 				from: this.configService.get<string>("EMAIL_USER"),
 				to: usuario,
 				subject: "Recuperação de Senha",
@@ -73,3 +73,11 @@ export class SendmailService {
 		}
 	}
 }
+
+
+/**
+ * Para criar a senha de aplicativo do Gmail, utilize o link abaixo:
+ * 
+ * https://myaccount.google.com/apppasswords
+ * 
+ */

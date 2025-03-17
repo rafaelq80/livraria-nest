@@ -1,5 +1,6 @@
 ﻿import { ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common"
 import { AuthGuard } from "@nestjs/passport"
+import { VerifyErrors } from "jsonwebtoken"
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard("jwt") {
@@ -8,7 +9,7 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 		return super.canActivate(context)
 	}
 
-	handleRequest(err: any, user: any, info: any) {
+	handleRequest(error: VerifyErrors, usuario: any, info?: Error & { name?: string; message?: string }) {
 		if (info?.name === "JsonWebTokenError") {
 			throw new UnauthorizedException("Token inválido. Por favor, forneça um token válido.")
 		}
@@ -19,10 +20,10 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 			)
 		}
 
-		if (err || !user) {
-			throw err || new UnauthorizedException("Acesso não autorizado.")
+		if (error || !usuario) {
+			throw error || new UnauthorizedException("Acesso não autorizado.")
 		}
 
-		return user
+		return usuario
 	}
 }

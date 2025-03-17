@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@emailjs/nodejs": "^5.0.2",
-    "@nestjs-modules/mailer": "^1.6.1",
+    "@nestjs-modules/mailer": "^2.0.2",
     "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^11.0.11",
     "@nestjs/config": "^4.0.1",
@@ -38,7 +38,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "html-minifier": "^4.0.0",
-    "mjml-cli": "^4.7.1",
+    "mjml-cli": "^4.15.3",
     "mjml-core": "^4.15.3",
     "mysql2": "^3.13.0",
     "nodemailer": "^6.10.0",
@@ -50,6 +50,7 @@
     "rxjs": "^7.8.2",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.21",
+    "typescript-eslint": "^8.26.1",
     "validator": "^13.12.0"
   },
   "devDependencies": {

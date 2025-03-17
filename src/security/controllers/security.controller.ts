@@ -6,6 +6,7 @@ import { UsuarioLoginDto } from "../dto/usuariologin.dto"
 import { LocalAuthGuard } from "../guards/local-auth.guard"
 import { RecuperarSenhaService } from "../services/recuperarsenha.service"
 import { SecurityService } from "../services/security.service"
+import { UsuarioAutenticado } from "../types/usuarioautenticado"
 
 @ApiTags('Usuário')
 @ApiBearerAuth()
@@ -19,7 +20,7 @@ export class SecurityController {
 	@UseGuards(LocalAuthGuard)
 	@HttpCode(HttpStatus.OK)
 	@Post("/logar")
-	login(@Body() usuario: UsuarioLoginDto): Promise<any> {
+	login(@Body() usuario: UsuarioLoginDto): Promise<UsuarioAutenticado> {
 		return this.securityService.login(usuario)
 	}
 
@@ -30,8 +31,8 @@ export class SecurityController {
 			return {
 				message: "Se o e-mail existir em nossa base, um link de recuperação será enviado para o seu e-mail.",
 			}
-		} catch (error) {
-			// Não expor detalhes específicos do erro para não revelar informações sensíveis
+		} catch (error: unknown) {
+			console.error("Erro: ", error instanceof Error ? error.message : error);
 			return {
 				message: "Se o e-mail existir em nossa base, um link de recuperação será enviado para o seu e-mail.",
 			}

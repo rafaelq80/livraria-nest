@@ -14,11 +14,11 @@ export class SecurityService {
 		private readonly bcrypt: Bcrypt,
 	) {}
 
-	async validateUser(usuario: string, senha: string): Promise<Omit<UsuarioAutenticado, "token">> {
+	async validateUser(usuario: string, senhaDigitada: string): Promise<Omit<UsuarioAutenticado, "token">> {
 		
-        this.validarCredenciais(usuario, senha)
+        this.validarCredenciais(usuario, senhaDigitada)
 		
-        const [usuarioNormalizado, senhaNormalizada] = this.sanitizarCredenciais(usuario, senha)
+        const [usuarioNormalizado, senhaNormalizada] = this.sanitizarCredenciais(usuario, senhaDigitada)
 
 		const buscaUsuario = await this.usuarioService.findByUsuario(usuarioNormalizado)
 		
@@ -30,7 +30,7 @@ export class SecurityService {
         if (!validarSenha)
 			throw new HttpException("Senha incorreta!", HttpStatus.UNAUTHORIZED)
 
-		const { senha: _, ...dadosUsuario } = buscaUsuario
+		const { senha, ...dadosUsuario } = buscaUsuario
 
 		return dadosUsuario
 	}

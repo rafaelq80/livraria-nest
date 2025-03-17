@@ -1,12 +1,12 @@
 ﻿import { HttpException, HttpStatus, Injectable } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { Repository } from "typeorm"
+import { ImageKitService } from "../../imagekit/services/imagekit.service"
 import { RoleService } from "../../role/services/role.service"
 import { Bcrypt } from "../../security/bcrypt/bcrypt"
 import { SendmailService } from "../../sendmail/services/sendmail.service"
 import { Usuario } from "../entities/usuario.entity"
-import { ImageKitService } from "../../imagekit/services/imagekit.service"
-import { ImagekitDto } from "../../imagekit/dto/imagekit.dto"
+import { Role } from "../../role/entities/role.entity"
 
 @Injectable()
 export class UsuarioService {
@@ -98,7 +98,7 @@ export class UsuarioService {
 		return await this.usuarioRepository.save(buscaUsuario)
 	}
 
-	private async validateRoles(roles: any[]): Promise<void> {
+	private async validateRoles(roles: Role[]): Promise<void> {
 		if (!roles || !Array.isArray(roles)) {
 			throw new HttpException("Lista de roles inválida", HttpStatus.BAD_REQUEST)
 		}
@@ -106,7 +106,8 @@ export class UsuarioService {
 		for (const role of roles) {
 			try {
 				await this.roleService.findById(role.id)
-			} catch (error) {
+			}catch (error: unknown) {
+				console.error("Erro: ", error instanceof Error ? error.message : error);
 				throw new HttpException(
 					`Autor com ID ${role.id} não encontrado`,
 					HttpStatus.NOT_FOUND,

@@ -5,6 +5,7 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Produto } from '../entities/produto.entity';
 import { DeleteResult, ILike, Repository } from 'typeorm';
+import { Autor } from '../../autor/entities/autor.entity';
 
 @Injectable()
 export class ProdutoService {
@@ -100,7 +101,7 @@ export class ProdutoService {
     return await this.produtoRepository.delete(id);
   }
 
-  private async validateAutores(autores: any[]): Promise<void> {
+  private async validateAutores(autores: Autor[]): Promise<void> {
     if (!autores || !Array.isArray(autores)) {
       throw new HttpException(
         'Lista de autores inválida',
@@ -111,7 +112,8 @@ export class ProdutoService {
     for (const autor of autores) {
       try {
         await this.autorService.findById(autor.id);
-      } catch (error) {
+      } catch (error: unknown) {
+        console.error("Erro: ", error instanceof Error ? error.message : error);
         throw new HttpException(
           `Autor com ID ${autor.id} não encontrado`,
           HttpStatus.NOT_FOUND,
