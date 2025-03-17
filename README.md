@@ -15,16 +15,6 @@ O **Projeto Livraria** é uma **API REST** desenvolvida com **NestJS**, voltada 
 
 A aplicação foi projetada para oferecer uma plataforma segura e eficiente para administração de catálogos de livros e gestão de usuários. O projeto possui integração com um frontend web e, futuramente, um aplicativo mobile para melhorar a experiência de compra e navegação.
 
-<br />
-
-### 1.1. Funcionalidades Principais:
-
-1. Um catálogo de livros disponíveis
-2. Funcionalidade de busca e filtragem de opções
-3. Sistema de pedidos e pagamentos online
-4. Rastreamento de entrega
-5. Avaliações e feedback dos usuários
-
 ------
 
 ## 2. Sobre esta API
@@ -123,14 +113,6 @@ class Role {
   + update(role : Role)
   + delete(id : number)
 }
-class UsuarioLogin{
-  - id : number
-  - nome : string
-  - usuario : string
-  - senha : string
-  - foto : string
-  - token : string
-}
 Categoria "1" <--> "*" Produto
 Autor "*" <--> "*" Produto
 Editora "1" <--> "*" Produto
@@ -194,9 +176,19 @@ DATABASE_USER=seu_usuario
 DATABASE_PASSWORD=sua_senha
 DATABASE_NAME=db_livraria
 JWT_SECRET=sua_chave_secreta
+BACKEND_URL=http://localhost:4000 ou endereço do deploy do Backend
+FRONTEND_URL=http://localhost:5173 ou endereço do deploy do Frontend
+EMAIL_USER= Endereço do Gmail válido)
+EMAIL_PASSWORD= Senha de aplicativo do Gmail (https://myaccount.google.com/apppasswords)
+IMAGEKIT_PRIVATE_KEY= Chave Privada da sua conta no imagekit (https://imagekit.io/)
+IMAGEKIT_URL_ENDPOINT=https://upload.imagekit.io/api/v1/files/upload
+IMAGEKIT_URL_DELETE=https://api.imagekit.io/v1/files
 ```
 
-5. Execute a aplicação: `npm run start:dev`
+**IMPORTANTE:** Não utilize a senha de acesso a conta do Gmail, crie uma senha de aplicativo, através do link indicado ao lado.
+
+
+7. Execute a aplicação: `npm run start:dev`
 
 ------
 
@@ -211,9 +203,11 @@ src/
 ├── categoria/         # Módulo de Categorias
 ├── data/              # Configurações do banco de dados
 ├── editora/           # Módulo de Editoras
+├── imagekit/          # Módulo de integração com a API do Imagekit
 ├── produto/           # Módulo de Produtos
 ├── role/              # Módulo de Roles
 ├── security/          # Módulo de autenticação
+├── sendmail/          # Módulo de envio de e-mail
 ├── usuario/           # Módulo de Usuários
 ├── util/              # Funções auxiliares (ex: cálculos, conversores, entre outros)
 └── app.module.ts      # Módulo principal da aplicação
@@ -226,5 +220,7 @@ src/
 
 ## 8. Implementações Futuras
 
-- [ ] **Avaliações de Produtos**: Implementar a função Curtir livros
-- [ ] **Envio de E-mail**: Implementar notificações por e-mail para os usuários (ex.: confirmação de cadastro).
+- [ ] **Avaliações de Produtos**: Implementar a função Curtir Produto
+- [x] **Envio de imagens para o Imagekit**: Implementar o upload de imagens para o imagekit.
+- [x] **Envio de E-mail**: Implementar notificações por e-mail para os usuários (ex.: confirmação de cadastro).
+- [x] **Recuperação de senha**: Implementar a recuperação da senha do usuário.
