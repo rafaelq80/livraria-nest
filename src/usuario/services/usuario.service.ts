@@ -2,11 +2,11 @@
 import { InjectRepository } from "@nestjs/typeorm"
 import { Repository } from "typeorm"
 import { ImageKitService } from "../../imagekit/services/imagekit.service"
+import { Role } from "../../role/entities/role.entity"
 import { RoleService } from "../../role/services/role.service"
 import { Bcrypt } from "../../security/bcrypt/bcrypt"
 import { SendmailService } from "../../sendmail/services/sendmail.service"
 import { Usuario } from "../entities/usuario.entity"
-import { Role } from "../../role/entities/role.entity"
 
 @Injectable()
 export class UsuarioService {
@@ -37,17 +37,22 @@ export class UsuarioService {
 	}
 
 	async findById(id: number): Promise<Usuario> {
+		if (id <= 0) throw new HttpException("Id inválido!", HttpStatus.BAD_REQUEST)
+
 		const usuario = await this.usuarioRepository.findOne({
-			where: { id },
+			where: {
+				id,
+			},
 			relations: {
 				roles: true,
-			},
+			}
 		})
 
-		if (!usuario) throw new HttpException("Usuario não encontrado!", HttpStatus.NOT_FOUND)
+		if (!usuario) throw new HttpException("Usuário não encontrado!", HttpStatus.NOT_FOUND)
 
 		return usuario
-	}
+	}	
+	
 
 	async create(usuario: Usuario, foto: Express.Multer.File): Promise<Usuario> {
 
@@ -61,7 +66,7 @@ export class UsuarioService {
 
 		const saveUsuario = await this.usuarioRepository.save(usuario)
 
-		await this.sendmailService.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
+		//await this.sendmailService.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
 
 		const fotoUrl = await this.imagekitService.handleImage({ file: foto, recurso: 'usuario', usuarioId: usuario.id })
 
@@ -69,9 +74,9 @@ export class UsuarioService {
 			saveUsuario.foto = fotoUrl
 		}
 
-		await this.usuarioRepository.update(saveUsuario.id, saveUsuario)
+		await this.usuarioRepository.save(saveUsuario)
 
-		return this.findById(usuario.id)
+		return saveUsuario
 	}
 
 	async update(usuario: Usuario): Promise<Usuario> {
