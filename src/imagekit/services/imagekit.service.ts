@@ -31,7 +31,10 @@ export class ImageKitService {
       const imageBuffer = await this.getImageBuffer(imagekitDto.file);
       if (!imageBuffer) return undefined;
 
-      const file = this.createFileObject(imageBuffer, imagekitDto.recurso, imagekitDto.usuarioId);
+      const getUsuarioEmail = (usuario: string): string => usuario.split('@')[0];
+      
+      const file = this.createFileObject(imageBuffer, imagekitDto.recurso, getUsuarioEmail(imagekitDto.usuario));
+      
       return await this.uploadImage(file, `uploads/livraria/${imagekitDto.recurso}`);
     } catch (error) {
       console.error('Erro ao processar imagem:', error);
@@ -57,9 +60,9 @@ export class ImageKitService {
     return undefined;
   }
 
-  private createFileObject(buffer: Buffer, recurso: string, userId: number): Express.Multer.File {
+  private createFileObject(buffer: Buffer, recurso: string, usuario: string): Express.Multer.File {
     const timestamp = Date.now();
-    const filename = `${recurso}_${userId}_${timestamp}.jpg`;
+    const filename = `${recurso}_${usuario}_${timestamp}.jpg`;
     return {
       buffer,
       originalname: filename,

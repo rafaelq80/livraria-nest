@@ -30,6 +30,7 @@ export class SecurityService {
         if (!validarSenha)
 			throw new HttpException("Senha incorreta!", HttpStatus.UNAUTHORIZED)
 
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const { senha, ...dadosUsuario } = buscaUsuario
 
 		return dadosUsuario

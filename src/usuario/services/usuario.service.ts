@@ -2,7 +2,6 @@
 import { InjectRepository } from "@nestjs/typeorm"
 import { Repository } from "typeorm"
 import { ImageKitService } from "../../imagekit/services/imagekit.service"
-import { Role } from "../../role/entities/role.entity"
 import { RoleService } from "../../role/services/role.service"
 import { Bcrypt } from "../../security/bcrypt/bcrypt"
 import { SendmailService } from "../../sendmail/services/sendmail.service"
@@ -60,23 +59,17 @@ export class UsuarioService {
 			throw new HttpException("O Usuario ja existe!", HttpStatus.BAD_REQUEST)
 		}
 
-		await this.validateRoles(usuario.roles)
-
 		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
-
-		const saveUsuario = await this.usuarioRepository.save(usuario)
 
 		//await this.sendmailService.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
 
-		const fotoUrl = await this.imagekitService.handleImage({ file: foto, recurso: 'usuario', usuarioId: usuario.id })
+		const fotoUrl = await this.imagekitService.handleImage({ file: foto, recurso: 'usuario', usuario: usuario.usuario })
 
 		if (fotoUrl) {
-			saveUsuario.foto = fotoUrl
+			usuario.foto = fotoUrl
 		}
 
-		await this.usuarioRepository.save(saveUsuario)
-
-		return saveUsuario
+		return await this.usuarioRepository.save(usuario)
 	}
 
 	async update(usuario: Usuario): Promise<Usuario> {
@@ -88,7 +81,7 @@ export class UsuarioService {
 			throw new HttpException("Usuário (e-mail) já Cadastrado!", HttpStatus.BAD_REQUEST)
 		}
 
-		await this.validateRoles(usuario.roles)
+		await this.roleService.validateRoles(usuario.roles)
 
 		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
 
@@ -103,21 +96,5 @@ export class UsuarioService {
 		return await this.usuarioRepository.save(buscaUsuario)
 	}
 
-	private async validateRoles(roles: Role[]): Promise<void> {
-		if (!roles || !Array.isArray(roles)) {
-			throw new HttpException("Lista de roles inválida", HttpStatus.BAD_REQUEST)
-		}
-
-		for (const role of roles) {
-			try {
-				await this.roleService.findById(role.id)
-			}catch (error: unknown) {
-				console.error("Erro: ", error instanceof Error ? error.message : error);
-				throw new HttpException(
-					`Autor com ID ${role.id} não encontrado`,
-					HttpStatus.NOT_FOUND,
-				)
-			}
-		}
-	}
+	
 }

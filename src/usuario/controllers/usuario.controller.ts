@@ -49,8 +49,11 @@ export class UsuarioController {
 	    @Body() usuario: Usuario,
 	    @UploadedFile() foto: Express.Multer.File
 	): Promise<Usuario>{
+
         const usuarioRoles = await this.roleService.processarRoles(usuario)
+
 	    return await this.usuarioService.create(usuarioRoles, foto)
+
 	}
 
 	@UseGuards(JwtAuthGuard)

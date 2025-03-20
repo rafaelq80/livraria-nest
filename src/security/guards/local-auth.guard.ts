@@ -8,7 +8,7 @@ export class LocalAuthGuard extends AuthGuard("local") {
 		return super.canActivate(context)
 	}
 
-	handleRequest(error: Error, usuario: any, info: Error & { message?: string }) {
+	handleRequest(error: Error, usuario: never, info: Error & { message?: string }) {
 		if (error || !usuario) {
 			if (info?.message === "Invalid credentials") {
 				throw new UnauthorizedException("Usuário ou senha inválidos!")

@@ -9,7 +9,7 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 		return super.canActivate(context)
 	}
 
-	handleRequest(error: VerifyErrors, usuario: any, info?: Error & { name?: string; message?: string }) {
+	handleRequest(error: VerifyErrors, usuario: never, info?: Error & { name?: string; message?: string }) {
 		if (info?.name === "JsonWebTokenError") {
 			throw new UnauthorizedException("Token inválido. Por favor, forneça um token válido.")
 		}

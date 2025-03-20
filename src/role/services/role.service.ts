@@ -59,26 +59,54 @@ export class RoleService {
 	}
 
 	async processarRoles(usuario: Usuario) {
+		// Se o campo roles não existir, retorna o usuário com roles como um array vazio ([]).
 		if (!usuario.roles) return { ...usuario, roles: [] };
 	
 		try {
+			// Se roles for uma string JSON, faz o parse para um array.
 			const parsedRoles = typeof usuario.roles === "string" ? JSON.parse(usuario.roles) : usuario.roles;
 	
+			// Se roles não for um array, lança um erro informando que precisa ser um array de números.
 			if (!Array.isArray(parsedRoles)) {
 				throw new BadRequestException("O campo roles deve ser um array de números.");
 			}
 	
+			// Extrai os IDs dos objetos { id: number } e filtra valores inválidos.
 			const rolesArray = parsedRoles
 				.map((role) => (typeof role === "object" && role.id ? role.id : role))
 				.filter((id) => typeof id === "number" && id > 0);
 	
-			//console.log("IDs das roles recebidos:", rolesArray);
-			
-			const roles = await Promise.all(rolesArray.map((id) => this.findById(id)));
-			return { ...usuario, roles };
-		} catch (error) {
+			// Converte os IDs filtrados de volta para objetos Role antes da validação
+			const rolesParaValidar: Role[] = rolesArray.map((id) => ({ id } as Role));
+	
+			// Chama a função validateRoles para verificar se os roles existem
+			await this.validateRoles(rolesParaValidar);
+	
+			// Retorna o usuário original, mantendo os IDs das roles validadas
+			return { ...usuario, roles: rolesParaValidar };
+	
+		} catch (error: unknown) {
 			console.error(error);
 			throw new BadRequestException("Formato inválido para o campo roles. Deve ser um array JSON.");
+		}
+	}
+	
+
+	async validateRoles(roles: Role[]): Promise<void> {
+		if (!roles || !Array.isArray(roles)) {
+			throw new HttpException("Lista de roles inválida", HttpStatus.BAD_REQUEST)
+		}
+
+		for (const role of roles) {
+			try {
+				await this.findById(role.id)
+			}catch (error: unknown) {
+				console.error("Erro: ", error instanceof Error ? error.message : error);
+				throw new HttpException(
+					`Role id ${role.id} não encontrado`,
+					HttpStatus.NOT_FOUND,
+				)
+			}
 		}
 	}
 	

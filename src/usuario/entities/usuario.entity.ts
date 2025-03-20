@@ -41,7 +41,7 @@ export class Usuario {
   foto?: string;
 
   @ApiProperty()
-  @ManyToMany(() => Role, (role) => role.usuarios, { cascade: true })
+  @ManyToMany(() => Role, (roles) => roles.usuarios, { cascade: true })
     @JoinTable({
       name: 'tb_usuarios_roles',
       joinColumn: { name: 'usuario_id', referencedColumnName: 'id' },
