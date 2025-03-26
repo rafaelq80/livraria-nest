@@ -1,15 +1,15 @@
 import { Module } from "@nestjs/common"
 import { ConfigModule } from "@nestjs/config"
 import { TypeOrmModule } from "@nestjs/typeorm"
+import { AppController } from "./app.controller"
 import { AutorModule } from "./autor/autor.module"
 import { CategoriaModule } from "./categoria/categoria.module"
-import { DevService } from "./data/services/dev.service"
+import { ProdService } from "./data/services/prod.service"
 import { EditoraModule } from "./editora/editora.module"
 import { ProdutoModule } from "./produto/produto.module"
 import { RoleModule } from "./role/role.module"
 import { SecurityModule } from "./security/security.module"
 import { UsuarioModule } from "./usuario/usuario.module"
-import { AppController } from "./app.controller"
 
 @Module({
 	imports: [
@@ -17,7 +17,7 @@ import { AppController } from "./app.controller"
 			isGlobal: true,
 		}),
 		TypeOrmModule.forRootAsync({
-			useClass: DevService,
+			useClass: ProdService,
 			imports: [ConfigModule],
 		}),
 		ProdutoModule,

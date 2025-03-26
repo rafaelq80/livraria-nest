@@ -14,6 +14,10 @@ export class Role {
 	nome: string
 
 	@ApiProperty()
+	@Column({ length: 255, nullable: false })
+	descricao: string
+
+	@ApiProperty()
 	@ManyToMany(() => Usuario, (usuarios) => usuarios.roles)
 	usuarios: Usuario[]
 }
