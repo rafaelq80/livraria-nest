@@ -53,6 +53,7 @@ export class SecurityService {
 			nome: buscaUsuario.nome,
 			usuario: usuarioLogin.usuario,
 			foto: buscaUsuario.foto,
+			roles: buscaUsuario.roles,
 			token,
 		}
 	}
