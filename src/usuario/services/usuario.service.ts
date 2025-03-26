@@ -61,15 +61,17 @@ export class UsuarioService {
 
 		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
 
-		//await this.sendmailService.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
-
 		const fotoUrl = await this.imagekitService.handleImage({ file: foto, recurso: 'usuario', usuario: usuario.usuario })
 
 		if (fotoUrl) {
 			usuario.foto = fotoUrl
 		}
 
-		return await this.usuarioRepository.save(usuario)
+		const saveUsuario = await this.usuarioRepository.save(usuario)
+
+		await this.sendmailService.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
+
+		return saveUsuario
 	}
 
 	async update(usuario: Usuario): Promise<Usuario> {
