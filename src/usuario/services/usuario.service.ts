@@ -6,6 +6,7 @@ import { RoleService } from "../../role/services/role.service"
 import { Bcrypt } from "../../security/bcrypt/bcrypt"
 import { SendmailService } from "../../sendmail/services/sendmail.service"
 import { Usuario } from "../entities/usuario.entity"
+import { Role } from "../../role/entities/role.entity"
 
 @Injectable()
 export class UsuarioService {
@@ -44,24 +45,26 @@ export class UsuarioService {
 			},
 			relations: {
 				roles: true,
-			}
+			},
 		})
 
 		if (!usuario) throw new HttpException("Usuário não encontrado!", HttpStatus.NOT_FOUND)
 
 		return usuario
-	}	
-	
+	}
 
 	async create(usuario: Usuario, foto: Express.Multer.File): Promise<Usuario> {
-
 		if (await this.findByUsuario(usuario.usuario)) {
 			throw new HttpException("O Usuario ja existe!", HttpStatus.BAD_REQUEST)
 		}
 
 		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
 
-		const fotoUrl = await this.imagekitService.handleImage({ file: foto, recurso: 'usuario', usuario: usuario.usuario })
+		const fotoUrl = await this.imagekitService.handleImage({
+			file: foto,
+			recurso: "usuario",
+			usuario: usuario.usuario,
+		})
 
 		if (fotoUrl) {
 			usuario.foto = fotoUrl
@@ -74,20 +77,47 @@ export class UsuarioService {
 		return saveUsuario
 	}
 
-	async update(usuario: Usuario): Promise<Usuario> {
-		await this.findById(usuario.id)
-
+	async update(usuario: Usuario, foto?: Express.Multer.File): Promise<Usuario> {
+		
+		const usuarioDatabase = await this.findById(usuario.id)
 		const buscaUsuario = await this.findByUsuario(usuario.usuario)
 
-		if (buscaUsuario && buscaUsuario.id !== usuario.id) {
+		if (buscaUsuario && usuarioDatabase.id.toString() !== usuario.id.toString()) {
 			throw new HttpException("Usuário (e-mail) já Cadastrado!", HttpStatus.BAD_REQUEST)
 		}
 
-		await this.roleService.validateRoles(usuario.roles)
+		if (foto) {
+			const fotoUrl = await this.imagekitService.handleImage({
+				file: foto,
+				recurso: "usuario",
+				usuario: usuario.usuario,
+			})
+			if (fotoUrl) {
+				usuario.foto = fotoUrl
+			}
+		}
 
 		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
 
-		return await this.usuarioRepository.save(usuario)
+		// Remove os Roles Atuais
+		await this.removerRolesUsuario(usuario.id)
+
+		// Adiciona os novos Roles
+		await this.adicionarRolesUsuario(usuario.id, usuario.roles)
+
+		// Cria o Objeto de Atualização dos dados do Usuário
+		const updateData = {
+			nome: usuario.nome,
+			usuario: usuario.usuario,
+			senha: usuario.senha,
+			foto: usuario.foto,
+		}
+
+		// Atualiza os dados do usuário
+		await this.usuarioRepository.update(usuario.id, updateData)
+
+		// Retorna os dados atualizados
+		return this.findById(usuario.id)
 	}
 
 	async updateSenha(usuario: string, senha: string): Promise<Usuario> {
@@ -98,5 +128,38 @@ export class UsuarioService {
 		return await this.usuarioRepository.save(buscaUsuario)
 	}
 
-	
+	// Métodos Auxiliares
+
+	async removerRolesUsuario(id: number): Promise<void> {
+		// Localiza todos os Roles do usuário
+		const existingRoles = await this.usuarioRepository
+			.createQueryBuilder()
+			.relation(Usuario, "roles")
+			.of(id)
+			.loadMany()
+
+		// Remopve todos os Roles do Usuário
+		if (existingRoles.length > 0) {
+			await this.usuarioRepository
+				.createQueryBuilder()
+				.relation(Usuario, "roles")
+				.of(id)
+				.remove(existingRoles)
+		}
+	}
+
+	async adicionarRolesUsuario(id: number, roles: Role[]): Promise<void> {
+		
+		// Valida os roles antes de adicionar
+		if (roles && roles.length > 0) {
+			await this.roleService.validateRoles(roles)
+
+			// Adiciona os novos Roles
+			await this.usuarioRepository
+				.createQueryBuilder()
+				.relation(Usuario, "roles")
+				.of(id)
+				.add(roles)
+		}
+	}
 }

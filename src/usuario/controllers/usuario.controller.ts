@@ -58,8 +58,16 @@ export class UsuarioController {
 
 	@UseGuards(JwtAuthGuard)
 	@Put("/atualizar")
+	@UseInterceptors(FileInterceptor('foto'))
 	@HttpCode(HttpStatus.OK)
-	async update(@Body() usuario: Usuario): Promise<Usuario> {
-		return this.usuarioService.update(usuario)
+	async update(
+	    @Body() usuario: Usuario,
+	    @UploadedFile() foto?: Express.Multer.File
+	): Promise<Usuario>{
+
+        const usuarioRoles = await this.roleService.processarRoles(usuario)
+
+	    return await this.usuarioService.update(usuarioRoles, foto)
+
 	}
 }

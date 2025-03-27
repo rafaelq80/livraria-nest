@@ -1,6 +1,6 @@
 import { BadRequestException, HttpException, HttpStatus, Injectable } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import { Repository } from "typeorm"
+import { In, Repository } from "typeorm"
 import { Role } from "../entities/role.entity"
 import { Usuario } from "../../usuario/entities/usuario.entity"
 
@@ -52,24 +52,32 @@ export class RoleService {
 	async processarRoles(usuario: Usuario): Promise<Usuario> {
 		// Se não tem roles, retorna array vazio
 		if (!usuario.roles) return { ...usuario, roles: [] }
-
 		try {
 			// Verifica se a entrada é uma string e converte para objeto
 			const rolesData =
 				typeof usuario.roles === "string" ? JSON.parse(usuario.roles) : usuario.roles
-
+			
 			// Verifica se é um array
 			if (!Array.isArray(rolesData)) {
 				throw new BadRequestException("O campo roles deve ser um array")
 			}
-
-			// Extrai os IDs válidos e cria objetos Role
+			
+			// Extrai os IDs válidos
 			const roleIds = this.extrairIdsValidos(rolesData)
-			const roles = roleIds.map((id) => ({ id }) as Role)
-
-			// Valida se os roles existem no banco
+			
+			// Busca os roles completos no banco de dados
+			const roles = await this.roleRepository.findBy({
+				id: In(roleIds) // Usando o operador In do TypeORM
+			})
+			
+			// Verifica se todos os roles foram encontrados
+			if (roles.length !== roleIds.length) {
+				throw new BadRequestException("Algumas roles não foram encontradas")
+			}
+			
+			// Valida os roles encontrados
 			await this.validateRoles(roles)
-
+			
 			return { ...usuario, roles }
 		} catch (error) {
 			if (error instanceof HttpException) throw error

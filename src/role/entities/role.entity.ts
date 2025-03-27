@@ -18,6 +18,6 @@ export class Role {
 	descricao: string
 
 	@ApiProperty()
-	@ManyToMany(() => Usuario, (usuarios) => usuarios.roles)
+	@ManyToMany(() => Usuario, (usuario) => usuario.roles)
 	usuarios: Usuario[]
 }
