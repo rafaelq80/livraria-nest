@@ -30,10 +30,8 @@ export class ImageKitService {
       await this.deleteOldImage(imagekitDto.oldImageUrl);
       const imageBuffer = await this.getImageBuffer(imagekitDto.file);
       if (!imageBuffer) return undefined;
-
-      const getUsuarioEmail = (usuario: string): string => usuario.split('@')[0];
-      
-      const file = this.createFileObject(imageBuffer, imagekitDto.recurso, getUsuarioEmail(imagekitDto.usuario));
+  
+      const file = this.createFileObject(imageBuffer, imagekitDto.recurso, imagekitDto.identificador);
       
       return await this.uploadImage(file, `uploads/livraria/${imagekitDto.recurso}`);
     } catch (error) {
@@ -60,9 +58,9 @@ export class ImageKitService {
     return undefined;
   }
 
-  private createFileObject(buffer: Buffer, recurso: string, usuario: string): Express.Multer.File {
+  private createFileObject(buffer: Buffer, recurso: string, identificador: string): Express.Multer.File {
     const timestamp = Date.now();
-    const filename = `${recurso}_${usuario}_${timestamp}.jpg`;
+    const filename = `${recurso}_${identificador}_${timestamp}.jpg`;
     return {
       buffer,
       originalname: filename,

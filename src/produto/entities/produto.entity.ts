@@ -1,3 +1,4 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, TransformFnParams } from 'class-transformer';
 import { IsNotEmpty, IsNumber } from 'class-validator';
 import {
@@ -10,11 +11,9 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Autor } from '../../autor/entities/autor.entity';
-import { IsISBN } from '../../util/validators/isisbn.validator';
 import { Categoria } from '../../categoria/entities/categoria.entity';
 import { Editora } from '../../editora/entities/editora.entity';
-import { NumericTransformer } from '../../util/numerictransformer';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsISBN } from '../../util/validators/isisbn.validator';
 
 @Entity('tb_produtos')
 export class Produto {
@@ -30,14 +29,15 @@ export class Produto {
   titulo: string;
 
   @ApiProperty()
+  @Transform(({ value }) => parseFloat(value))
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsNotEmpty()
-  @Column({ type: 'decimal', precision: 10, scale: 2, transformer: new NumericTransformer() })
+  @Column({ type: 'decimal', precision: 10, scale: 2})
   preco: number;
 
   @ApiProperty()
-  @Column({ length: 5000 })
-  foto: string;
+	@Column({ type: "varchar", length: 5000, nullable: true })
+	foto?: string
 
   @IsISBN({ message: 'ISBN-10 inválido.' })
   @Column({ length: 255, nullable: false })

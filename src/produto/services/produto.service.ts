@@ -1,124 +1,179 @@
-import { EditoraService } from './../../editora/services/editora.service';
-import { CategoriaService } from './../../categoria/services/categoria.service';
-import { AutorService } from './../../autor/services/autor.service';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Produto } from '../entities/produto.entity';
-import { DeleteResult, ILike, Repository } from 'typeorm';
-import { Autor } from '../../autor/entities/autor.entity';
+import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common"
+import { InjectRepository } from "@nestjs/typeorm"
+import { DeleteResult, ILike, Repository } from "typeorm"
+import { Autor } from "../../autor/entities/autor.entity"
+import { ImageKitService } from "../../imagekit/services/imagekit.service"
+import { Produto } from "../entities/produto.entity"
+import { AutorService } from "./../../autor/services/autor.service"
+import { CategoriaService } from "./../../categoria/services/categoria.service"
+import { EditoraService } from "./../../editora/services/editora.service"
 
 @Injectable()
 export class ProdutoService {
-  constructor(
-    @InjectRepository(Produto)
-    private produtoRepository: Repository<Produto>,
-    private autorService: AutorService,
-    private categoriaService: CategoriaService,
-    private editoraService: EditoraService,
-  ) {}
+	private readonly logger = new Logger(ProdutoService.name)
 
-  async findAll(): Promise<Produto[]> {
-    return await this.produtoRepository.find({
-      relations: {
-        autores: true,
-        categoria: true,
-        editora: true,
-      },
-      order: {
-        titulo: 'ASC',
-      },
-      cache: true,
-    });
-  }
+	constructor(
+		@InjectRepository(Produto)
+		private produtoRepository: Repository<Produto>,
+		private autorService: AutorService,
+		private categoriaService: CategoriaService,
+		private editoraService: EditoraService,
+		private imagekitService: ImageKitService,
+	) {}
 
-  async findById(id: number): Promise<Produto> {
-    if (id <= 0)
-      throw new HttpException('Id inválido!', HttpStatus.BAD_REQUEST);
+	async findAll(): Promise<Produto[]> {
+		return await this.produtoRepository.find({
+			relations: {
+				autores: true,
+				categoria: true,
+				editora: true,
+			},
+			order: {
+				titulo: "ASC",
+			},
+			cache: true,
+		})
+	}
 
-    const produto = await this.produtoRepository.findOne({
-      where: {
-        id,
-      },
-      relations: {
-        autores: true,
-        categoria: true,
-        editora: true,
-      },
-    });
+	async findById(id: number): Promise<Produto> {
+		if (id <= 0) throw new HttpException("Id inválido!", HttpStatus.BAD_REQUEST)
 
-    if (!produto)
-      throw new HttpException('Produto não encontrado!', HttpStatus.NOT_FOUND);
+		const produto = await this.produtoRepository.findOne({
+			where: {
+				id,
+			},
+			relations: {
+				autores: true,
+				categoria: true,
+				editora: true,
+			},
+		})
 
-    return produto;
-  }
+		if (!produto) throw new HttpException("Produto não encontrado!", HttpStatus.NOT_FOUND)
 
-  async findByTitulo(titulo: string): Promise<Produto[]> {
-    return await this.produtoRepository.find({
-      where: {
-        titulo: ILike(`%${titulo.trim()}%`),
-      },
-      relations: {
-        autores: true,
-        categoria: true,
-        editora: true,
-      },
-      order: {
-        titulo: 'ASC',
-      },
-    });
-  }
+		return produto
+	}
 
-  async create(produto: Produto): Promise<Produto> {
-    
-    await this.validateAutores(produto.autores);
-    
-    await this.categoriaService.findById(produto.categoria.id);
-    await this.editoraService.findById(produto.editora.id);
+	async findByTitulo(titulo: string): Promise<Produto[]> {
+		return await this.produtoRepository.find({
+			where: {
+				titulo: ILike(`%${titulo.trim()}%`),
+			},
+			relations: {
+				autores: true,
+				categoria: true,
+				editora: true,
+			},
+			order: {
+				titulo: "ASC",
+			},
+		})
+	}
 
-    return await this.produtoRepository.save(produto);
-  }
+	async create(produto: Produto, foto: Express.Multer.File): Promise<Produto> {
+		
+    const fotoUrl = await this.imagekitService.handleImage({
+			file: foto,
+			recurso: "produto",
+			identificador: produto.id.toString(),
+		})
 
-  async update(produto: Produto): Promise<Produto> {
-    if (!produto || !produto.id)
-      throw new HttpException('Produto inválido!', HttpStatus.BAD_REQUEST);
+		if (fotoUrl) {
+			produto.foto = fotoUrl
+		}
 
-    await this.findById(produto.id);
+		// Busca e atribui as instâncias corretas
+		produto.categoria = await this.categoriaService.findById(produto.categoria.id)
+		produto.editora = await this.editoraService.findById(produto.editora.id)
 
-    await this.validateAutores(produto.autores);
+		const saveProduto = await this.produtoRepository.save(produto)
 
-    await this.categoriaService.findById(produto.categoria.id);
-    await this.editoraService.findById(produto.editora.id);
+		return saveProduto
+	}
 
-    return await this.produtoRepository.save(produto);
-  }
+	async update(produto: Produto, foto: Express.Multer.File): Promise<Produto> {
+		if (!produto || !produto.id)
+			throw new HttpException("Produto inválido!", HttpStatus.BAD_REQUEST)
 
-  async delete(id: number): Promise<DeleteResult> {
-    if (id <= 0)
-      throw new HttpException('Id inválido!', HttpStatus.BAD_REQUEST);
+		await this.findById(produto.id)
 
-    await this.findById(id);
+    if (foto) {
+			const fotoUrl = await this.imagekitService.handleImage({
+				file: foto,
+				recurso: "produto",
+				identificador: produto.id.toString(),
+			})
+			if (fotoUrl) {
+				produto.foto = fotoUrl
+			}
+		}
 
-    return await this.produtoRepository.delete(id);
-  }
 
-  private async validateAutores(autores: Autor[]): Promise<void> {
-    if (!autores || !Array.isArray(autores)) {
-      throw new HttpException(
-        'Lista de autores inválida',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+		// Busca e atribui as instâncias corretas
+		produto.categoria = await this.categoriaService.findById(produto.categoria.id)
+		produto.editora = await this.editoraService.findById(produto.editora.id)
 
-    for (const autor of autores) {
-      try {
-        await this.autorService.findById(autor.id);
-      } catch (error: unknown) {
-        console.error("Erro: ", error instanceof Error ? error.message : error);
-        throw new HttpException(
-          `Autor com ID ${autor.id} não encontrado`,
-          HttpStatus.NOT_FOUND,
-        );
-      }
-    }
-  }
+		// Remove os Autores Atuais
+		await this.removerAutoresProduto(produto.id)
+
+		// Adiciona os novos Autores
+		await this.adicionarAutoresProduto(produto.id, produto.autores)
+
+		// Cria o Objeto de Atualização dos dados do Produto
+		const updateData = {
+			titulo: produto.titulo,
+			preco: produto.preco,
+			isbn10: produto.isbn10,
+			isbn13: produto.isbn13,
+			foto: produto.foto,
+		}
+
+		// Atualiza os dados do Produto
+		await this.produtoRepository.update(produto.id, updateData)
+
+		// Retorna os dados atualizados
+		return this.findById(produto.id)
+	}
+
+	async delete(id: number): Promise<DeleteResult> {
+		if (id <= 0) throw new HttpException("Id inválido!", HttpStatus.BAD_REQUEST)
+
+		await this.findById(id)
+
+		return await this.produtoRepository.delete(id)
+	}
+
+	// Métodos Auxiliares
+
+	async removerAutoresProduto(id: number): Promise<void> {
+		// Localiza todos os Autores do Produto
+		const existingAutores = await this.produtoRepository
+			.createQueryBuilder()
+			.relation(Produto, "autores")
+			.of(id)
+			.loadMany()
+
+		// Remove todos os Autores do Produto
+		if (existingAutores.length > 0) {
+			await this.produtoRepository
+				.createQueryBuilder()
+				.relation(Produto, "autores")
+				.of(id)
+				.remove(existingAutores)
+		}
+	}
+
+	async adicionarAutoresProduto(id: number, autores: Autor[]): Promise<void> {
+		// Valida os Autores antes de adicionar
+		if (autores && autores.length > 0) {
+			await this.autorService.validateAutores(autores)
+
+			// Adiciona os novos Autores
+			await this.produtoRepository
+				.createQueryBuilder()
+				.relation(Produto, "autores")
+				.of(id)
+				.add(autores)
+		}
+	}
 }

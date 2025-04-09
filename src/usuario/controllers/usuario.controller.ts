@@ -1,16 +1,17 @@
 ﻿import {
-    Body,
-    Controller,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Param,
-    ParseIntPipe,
-    Post,
-    Put,
-    UploadedFile,
-    UseGuards,
-    UseInterceptors
+	BadRequestException,
+	Body,
+	Controller,
+	Get,
+	HttpCode,
+	HttpStatus,
+	Param,
+	ParseIntPipe,
+	Post,
+	Put,
+	UploadedFile,
+	UseGuards,
+	UseInterceptors,
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger"
@@ -42,32 +43,32 @@ export class UsuarioController {
 		return this.usuarioService.findById(id)
 	}
 
-	@Post('/cadastrar')
-	@UseInterceptors(FileInterceptor('foto'))
+	@Post("/cadastrar")
+	@UseInterceptors(FileInterceptor("foto"))
 	@HttpCode(HttpStatus.CREATED)
 	async create(
-	    @Body() usuario: Usuario,
-	    @UploadedFile() foto: Express.Multer.File
-	): Promise<Usuario>{
+		@Body() usuario: Usuario,
+		@UploadedFile() foto: Express.Multer.File,
+	): Promise<Usuario> {
+		if (!foto || !foto.originalname) {
+			throw new BadRequestException("Arquivo de imagem não enviado ou inválido.")
+		}
 
-        const usuarioRoles = await this.roleService.processarRoles(usuario)
+		const usuarioRoles = await this.roleService.processarRoles(usuario)
 
-	    return await this.usuarioService.create(usuarioRoles, foto)
-
+		return await this.usuarioService.create(usuarioRoles, foto)
 	}
 
 	@UseGuards(JwtAuthGuard)
 	@Put("/atualizar")
-	@UseInterceptors(FileInterceptor('foto'))
+	@UseInterceptors(FileInterceptor("foto"))
 	@HttpCode(HttpStatus.OK)
 	async update(
-	    @Body() usuario: Usuario,
-	    @UploadedFile() foto?: Express.Multer.File
-	): Promise<Usuario>{
+		@Body() usuario: Usuario,
+		@UploadedFile() foto?: Express.Multer.File,
+	): Promise<Usuario> {
+		const usuarioRoles = await this.roleService.processarRoles(usuario)
 
-        const usuarioRoles = await this.roleService.processarRoles(usuario)
-
-	    return await this.usuarioService.update(usuarioRoles, foto)
-
+		return await this.usuarioService.update(usuarioRoles, foto)
 	}
 }

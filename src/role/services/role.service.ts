@@ -3,11 +3,9 @@ import { InjectRepository } from "@nestjs/typeorm"
 import { In, Repository } from "typeorm"
 import { Role } from "../entities/role.entity"
 import { Usuario } from "../../usuario/entities/usuario.entity"
+import { HasId } from "../../types/hasid"
 
-// Interface simples para objetos com ID
-interface HasId {
-	id: number
-}
+
 
 @Injectable()
 export class RoleService {

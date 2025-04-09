@@ -63,7 +63,7 @@ export class UsuarioService {
 		const fotoUrl = await this.imagekitService.handleImage({
 			file: foto,
 			recurso: "usuario",
-			usuario: usuario.usuario,
+			identificador: usuario.id.toString(),
 		})
 
 		if (fotoUrl) {
@@ -90,7 +90,7 @@ export class UsuarioService {
 			const fotoUrl = await this.imagekitService.handleImage({
 				file: foto,
 				recurso: "usuario",
-				usuario: usuario.usuario,
+				identificador: usuario.id.toString(),
 			})
 			if (fotoUrl) {
 				usuario.foto = fotoUrl
