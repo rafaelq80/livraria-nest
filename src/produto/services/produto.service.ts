@@ -123,6 +123,7 @@ export class ProdutoService {
 		const updateData = {
 			titulo: produto.titulo,
 			preco: produto.preco,
+			desconto: produto.desconto,
 			isbn10: produto.isbn10,
 			isbn13: produto.isbn13,
 			foto: produto.foto,

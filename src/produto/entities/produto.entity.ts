@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, TransformFnParams } from 'class-transformer';
-import { IsNotEmpty, IsNumber } from 'class-validator';
+import { IsNotEmpty, IsNumber, Max, Min } from 'class-validator';
 import {
   Column,
   Entity,
@@ -34,6 +34,19 @@ export class Produto {
   @IsNotEmpty()
   @Column({ type: 'decimal', precision: 10, scale: 2})
   preco: number;
+
+  @ApiProperty({
+    example: 0,
+    description: 'Percentual de desconto (de 0 a 100)',
+    default: 0,
+  })
+  @Transform(({ value }) => parseFloat(value))
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  @IsNotEmpty()
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
+  desconto: number = 0;
 
   @ApiProperty()
 	@Column({ type: "varchar", length: 5000, nullable: true })
