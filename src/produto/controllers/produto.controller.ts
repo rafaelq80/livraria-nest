@@ -1,12 +1,14 @@
 import {
-	BadRequestException,
 	Body,
 	Controller,
 	Delete,
+	FileTypeValidator,
 	Get,
 	HttpCode,
 	HttpStatus,
+	MaxFileSizeValidator,
 	Param,
+	ParseFilePipe,
 	ParseIntPipe,
 	Post,
 	Put,
@@ -36,7 +38,6 @@ export class ProdutoController {
 		return this.produtoService.findAll()
 	}
 
-	@UseGuards(JwtAuthGuard)
 	@Get("/:id")
 	@HttpCode(HttpStatus.OK)
 	findById(@Param("id", ParseIntPipe) id: number): Promise<Produto> {
@@ -55,11 +56,16 @@ export class ProdutoController {
 	@HttpCode(HttpStatus.CREATED)
 	async create(
 		@Body() produto: Produto,
-		@UploadedFile() foto: Express.Multer.File,
+		@UploadedFile(
+			new ParseFilePipe({
+				validators: [
+					new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
+					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+				],
+			}),
+		)
+		foto: Express.Multer.File,
 	): Promise<Produto> {
-		if (!foto || !foto.originalname) {
-			throw new BadRequestException("Arquivo de imagem não enviado ou inválido.")
-		}
 		const produtoAutores = await this.autorService.processarAutores(produto)
 
 		return this.produtoService.create(produtoAutores, foto)
@@ -71,7 +77,16 @@ export class ProdutoController {
 	@HttpCode(HttpStatus.OK)
 	async update(
 		@Body() produto: Produto,
-		@UploadedFile() foto?: Express.Multer.File,
+		@UploadedFile(
+			new ParseFilePipe({
+				validators: [
+					new FileTypeValidator({ fileType: /(jpg|jpeg|png|webp)$/ }),
+					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+				],
+				fileIsRequired: false
+			}),
+		)
+		foto?: Express.Multer.File,
 	): Promise<Produto> {
 		const produtoAutores = await this.autorService.processarAutores(produto)
 

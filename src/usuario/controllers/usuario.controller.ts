@@ -1,17 +1,19 @@
 ﻿import {
-	BadRequestException,
 	Body,
 	Controller,
+	FileTypeValidator,
 	Get,
 	HttpCode,
 	HttpStatus,
+	MaxFileSizeValidator,
 	Param,
+	ParseFilePipe,
 	ParseIntPipe,
 	Post,
 	Put,
 	UploadedFile,
 	UseGuards,
-	UseInterceptors,
+	UseInterceptors
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger"
@@ -48,12 +50,17 @@ export class UsuarioController {
 	@HttpCode(HttpStatus.CREATED)
 	async create(
 		@Body() usuario: Usuario,
-		@UploadedFile() foto: Express.Multer.File,
+		@UploadedFile(
+			new ParseFilePipe({
+				validators: [
+					new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
+					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+				],
+			}),
+		)
+		foto: Express.Multer.File,
 	): Promise<Usuario> {
-		if (!foto || !foto.originalname) {
-			throw new BadRequestException("Arquivo de imagem não enviado ou inválido.")
-		}
-
+		
 		const usuarioRoles = await this.roleService.processarRoles(usuario)
 
 		return await this.usuarioService.create(usuarioRoles, foto)
@@ -65,7 +72,16 @@ export class UsuarioController {
 	@HttpCode(HttpStatus.OK)
 	async update(
 		@Body() usuario: Usuario,
-		@UploadedFile() foto?: Express.Multer.File,
+		@UploadedFile(
+			new ParseFilePipe({
+				validators: [
+					new FileTypeValidator({ fileType: /(jpg|jpeg|png|webp)$/ }),
+					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+				],
+				fileIsRequired: false
+			}),
+		)
+		foto?: Express.Multer.File,
 	): Promise<Usuario> {
 		const usuarioRoles = await this.roleService.processarRoles(usuario)
 

@@ -8,6 +8,6 @@ import { EditoraService } from './services/editora.service';
     imports: [TypeOrmModule.forFeature([Editora])],
     controllers: [EditoraController],
     providers: [EditoraService],
-    exports: [TypeOrmModule]
+    exports: [TypeOrmModule, EditoraService]
 })
 export class EditoraModule {};

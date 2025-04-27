@@ -40,6 +40,20 @@ export class AutorService {
 		return autor
 	}
 
+	async findManyByIds(ids: number[]): Promise<Map<number, Autor>> {
+		if (!ids.length) return new Map()
+
+		const autores = await this.autorRepository.findBy({ id: In(ids) })
+
+		if (autores.length !== ids.length) {
+			const foundIds = autores.map((a) => a.id)
+			const missingIds = ids.filter((id) => !foundIds.includes(id))
+			throw new BadRequestException(`Autores não encontrados: ${missingIds.join(", ")}`)
+		}
+
+		return new Map(autores.map((autor) => [autor.id, autor]))
+	}
+
 	async findByNome(nome: string): Promise<Autor[]> {
 		return await this.autorRepository.find({
 			where: {
@@ -77,33 +91,22 @@ export class AutorService {
 	}
 
 	async processarAutores(produto: Produto): Promise<Produto> {
-		// Se não tem autors, retorna array vazio
 		if (!produto.autores) return { ...produto, autores: [] }
+
 		try {
-			// Verifica se a entrada é uma string e converte para objeto
-			const autoresData =
-				typeof produto.autores === "string" ? JSON.parse(produto.autores) : produto.autores
+			// Padronizar o formato de entrada
+			const autoresData = Array.isArray(produto.autores)
+				? produto.autores
+				: typeof produto.autores === "string"
+					? JSON.parse(produto.autores)
+					: []
 
-			// Verifica se é um array
-			if (!Array.isArray(autoresData)) {
-				throw new BadRequestException("O campo autors deve ser um array")
-			}
-
-			// Extrai os IDs válidos
+			// Extrair IDs válidos
 			const autorIds = this.extrairIdsValidos(autoresData)
 
-			// Busca os autors completos no banco de dados
-			const autores = await this.autorRepository.findBy({
-				id: In(autorIds), // Usando o operador In do TypeORM
-			})
-
-			// Verifica se todos os autors foram encontrados
-			if (autores.length !== autorIds.length) {
-				throw new BadRequestException("Algumas autors não foram encontradas")
-			}
-
-			// Valida os autors encontrados
-			await this.validateAutores(autores)
+			// Buscar todos os autores de uma vez
+			const autoresMap = await this.findManyByIds(autorIds)
+			const autores = autorIds.map((id) => autoresMap.get(id))
 
 			return { ...produto, autores }
 		} catch (error) {
@@ -112,14 +115,15 @@ export class AutorService {
 		}
 	}
 
-	async validateAutores(autors: Autor[]): Promise<void> {
-		if (!autors || !Array.isArray(autors)) {
+	async validateAutores(autores: Autor[]): Promise<void> {
+		if (!autores || !Array.isArray(autores)) {
 			throw new BadRequestException("Lista de autores inválida")
 		}
 
-		for (const autor of autors) {
-			await this.findById(autor.id)
-		}
+		if (autores.length === 0) return
+
+		const ids = autores.map((autor) => autor.id)
+		await this.findManyByIds(ids) // Já lança exceção se algum autor não existir
 	}
 
 	// Extrai ids válidos (números > 0) de diversos formatos possíveis

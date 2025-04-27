@@ -1,4 +1,4 @@
-﻿import { HttpException, HttpStatus, Injectable } from "@nestjs/common"
+﻿import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { Repository } from "typeorm"
 import { ImageKitService } from "../../imagekit/services/imagekit.service"
@@ -6,10 +6,11 @@ import { RoleService } from "../../role/services/role.service"
 import { Bcrypt } from "../../security/bcrypt/bcrypt"
 import { SendmailService } from "../../sendmail/services/sendmail.service"
 import { Usuario } from "../entities/usuario.entity"
-import { Role } from "../../role/entities/role.entity"
 
 @Injectable()
 export class UsuarioService {
+	private readonly logger = new Logger(UsuarioService.name)
+
 	constructor(
 		@InjectRepository(Usuario)
 		private usuarioRepository: Repository<Usuario>,
@@ -54,70 +55,138 @@ export class UsuarioService {
 	}
 
 	async create(usuario: Usuario, foto: Express.Multer.File): Promise<Usuario> {
+		// Verificar existência do usuário fora da transação
 		if (await this.findByUsuario(usuario.usuario)) {
 			throw new HttpException("O Usuario ja existe!", HttpStatus.BAD_REQUEST)
 		}
 
+		// Criptografar senha
 		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
 
-		const fotoUrl = await this.imagekitService.handleImage({
-			file: foto,
-			recurso: "usuario",
-			identificador: usuario.id.toString(),
-		})
-
+		// Processar imagem
+		const fotoUrl = await this.processarImagem(usuario, foto)
 		if (fotoUrl) {
 			usuario.foto = fotoUrl
 		}
 
-		const saveUsuario = await this.usuarioRepository.save(usuario)
+		// Usar QueryRunner para transação
+		const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
 
-		await this.sendmailService.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
+		try {
+			await queryRunner.connect()
+			await queryRunner.startTransaction()
 
-		return saveUsuario
+			// Salvar usuário com seus roles
+			const saveUsuario = await queryRunner.manager.save(Usuario, usuario)
+
+			await queryRunner.commitTransaction()
+
+			// Enviar email após a transação bem-sucedida
+			await this.sendmailService
+				.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
+				.catch((error) => {
+					this.logger.warn(`Erro ao enviar email: ${error.message}`, error.stack)
+					// Não falha a operação se o email falhar
+				})
+
+			return saveUsuario
+		} catch (error) {
+			if (queryRunner.isTransactionActive) {
+				await queryRunner.rollbackTransaction()
+			}
+
+			this.logger.error(`Erro ao criar usuario: ${error.message}`, error.stack)
+			throw new HttpException(
+				`Erro ao criar usuario: ${error.message}`,
+				error instanceof HttpException
+					? error.getStatus()
+					: HttpStatus.INTERNAL_SERVER_ERROR,
+			)
+		} finally {
+			await queryRunner.release()
+		}
 	}
 
 	async update(usuario: Usuario, foto?: Express.Multer.File): Promise<Usuario> {
-		
-		const usuarioDatabase = await this.findById(usuario.id)
-		const buscaUsuario = await this.findByUsuario(usuario.usuario)
-
-		if (buscaUsuario && usuarioDatabase.id.toString() !== usuario.id.toString()) {
-			throw new HttpException("Usuário (e-mail) já Cadastrado!", HttpStatus.BAD_REQUEST)
+		if (!usuario?.id) {
+			throw new HttpException("Usuário inválido!", HttpStatus.BAD_REQUEST)
 		}
-
-		if (foto) {
-			const fotoUrl = await this.imagekitService.handleImage({
-				file: foto,
-				recurso: "usuario",
-				identificador: usuario.id.toString(),
-			})
+	
+		const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
+	
+		try {
+			// Buscar dados atuais do usuário
+			const usuarioAtual = await this.findById(usuario.id)
+			
+			// Verificar se o novo email já existe e pertence a outro usuário
+			const buscaUsuario = await this.findByUsuario(usuario.usuario)
+			if (buscaUsuario && buscaUsuario.id !== usuarioAtual.id) {
+				throw new HttpException("Usuário (e-mail) já Cadastrado!", HttpStatus.BAD_REQUEST)
+			}
+	
+			// Só criptografar senha se for diferente da armazenada
+			if (
+				usuario.senha &&
+				!(await this.bcrypt.compararSenhas(usuario.senha, usuarioAtual.senha))
+			) {
+				usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
+			} else {
+				usuario.senha = usuarioAtual.senha // Manter senha atual
+			}
+	
+			// Processar imagem se fornecida
+			const fotoUrl = await this.processarImagem(usuario, foto)
 			if (fotoUrl) {
 				usuario.foto = fotoUrl
+			} else if (!usuario.foto) {
+				usuario.foto = usuarioAtual.foto // Manter foto atual se não fornecida
 			}
+	
+			// Iniciar transação
+			await queryRunner.connect()
+			await queryRunner.startTransaction()
+	
+			// Preparar objeto de atualização apenas com campos fornecidos
+			const updateData: Partial<Usuario> = {}
+			if (usuario.nome !== undefined) updateData.nome = usuario.nome
+			if (usuario.usuario !== undefined) updateData.usuario = usuario.usuario
+			if (usuario.senha !== undefined) updateData.senha = usuario.senha
+			if (usuario.foto !== undefined) updateData.foto = usuario.foto
+	
+			// Executar atualização
+			await queryRunner.manager.update(Usuario, usuario.id, updateData)
+	
+			// Atualizar relações apenas se roles foram fornecidos
+			if (usuario.roles !== undefined) {
+				const usuarioEntity = await queryRunner.manager.findOne(Usuario, {
+					where: { id: usuario.id },
+					relations: { roles: true },
+				})
+	
+				usuarioEntity.roles = usuario.roles || []
+				await queryRunner.manager.save(Usuario, usuarioEntity)
+			}
+	
+			await queryRunner.commitTransaction()
+	
+			// Retornar usuario atualizado
+			return this.findById(usuario.id)
+		} catch (error) {
+			if (queryRunner.isTransactionActive) {
+				await queryRunner.rollbackTransaction()
+			}
+	
+			this.logger.error(`Erro ao atualizar usuario: ${error.message}`, error.stack)
+			throw new HttpException(
+				`Erro ao atualizar usuario: ${error.message}`,
+				error instanceof HttpException
+					? error.getStatus()
+					: HttpStatus.INTERNAL_SERVER_ERROR,
+			)
+		} finally {
+			// Release de recursos independente do resultado
+			await queryRunner.release()
 		}
-
-		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
-
-		// Remove os Roles Atuais
-		await this.removerRolesUsuario(usuario.id)
-
-		// Adiciona os novos Roles
-		await this.adicionarRolesUsuario(usuario.id, usuario.roles)
-
-		// Cria o Objeto de Atualização dos dados do Usuário
-		const updateData = {
-			nome: usuario.nome,
-			usuario: usuario.usuario,
-			senha: usuario.senha,
-			foto: usuario.foto,
-		}
-
-		// Atualiza os dados do usuário
-		await this.usuarioRepository.update(usuario.id, updateData)
-
-		// Retorna os dados atualizados
-		return this.findById(usuario.id)
 	}
 
 	async updateSenha(usuario: string, senha: string): Promise<Usuario> {
@@ -130,36 +199,21 @@ export class UsuarioService {
 
 	// Métodos Auxiliares
 
-	async removerRolesUsuario(id: number): Promise<void> {
-		// Localiza todos os Roles do usuário
-		const existingRoles = await this.usuarioRepository
-			.createQueryBuilder()
-			.relation(Usuario, "roles")
-			.of(id)
-			.loadMany()
+	private async processarImagem(
+		usuario: Usuario,
+		foto: Express.Multer.File,
+	): Promise<string | null> {
+		if (!foto) return null
 
-		// Remopve todos os Roles do Usuário
-		if (existingRoles.length > 0) {
-			await this.usuarioRepository
-				.createQueryBuilder()
-				.relation(Usuario, "roles")
-				.of(id)
-				.remove(existingRoles)
-		}
-	}
-
-	async adicionarRolesUsuario(id: number, roles: Role[]): Promise<void> {
-		
-		// Valida os roles antes de adicionar
-		if (roles && roles.length > 0) {
-			await this.roleService.validateRoles(roles)
-
-			// Adiciona os novos Roles
-			await this.usuarioRepository
-				.createQueryBuilder()
-				.relation(Usuario, "roles")
-				.of(id)
-				.add(roles)
+		try {
+			return await this.imagekitService.handleImage({
+				file: foto,
+				recurso: "produto",
+				identificador: usuario.id.toString(),
+			})
+		} catch (error) {
+			this.logger.error(`Erro ao processar imagem: ${error.message}`, error.stack)
+			return null
 		}
 	}
 }

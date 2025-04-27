@@ -1,10 +1,8 @@
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { DeleteResult, ILike, Repository } from "typeorm"
-import { Autor } from "../../autor/entities/autor.entity"
 import { ImageKitService } from "../../imagekit/services/imagekit.service"
 import { Produto } from "../entities/produto.entity"
-import { AutorService } from "./../../autor/services/autor.service"
 import { CategoriaService } from "./../../categoria/services/categoria.service"
 import { EditoraService } from "./../../editora/services/editora.service"
 
@@ -15,7 +13,6 @@ export class ProdutoService {
 	constructor(
 		@InjectRepository(Produto)
 		private produtoRepository: Repository<Produto>,
-		private autorService: AutorService,
 		private categoriaService: CategoriaService,
 		private editoraService: EditoraService,
 		private imagekitService: ImageKitService,
@@ -72,19 +69,20 @@ export class ProdutoService {
 
 	async create(produto: Produto, foto: Express.Multer.File): Promise<Produto> {
 		
-    const fotoUrl = await this.imagekitService.handleImage({
-			file: foto,
-			recurso: "produto",
-			identificador: produto.id.toString(),
-		})
-
+		// Processar imagem se fornecida
+		const fotoUrl = await this.processarImagem(produto, foto)
 		if (fotoUrl) {
 			produto.foto = fotoUrl
 		}
+		
+		// Buscar categoria e editora
+		const [categoria, editora] = await Promise.all([
+			this.categoriaService.findById(produto.categoria.id),
+			this.editoraService.findById(produto.editora.id),
+		])
 
-		// Busca e atribui as instâncias corretas
-		produto.categoria = await this.categoriaService.findById(produto.categoria.id)
-		produto.editora = await this.editoraService.findById(produto.editora.id)
+		produto.categoria = categoria
+		produto.editora = editora
 
 		const saveProduto = await this.produtoRepository.save(produto)
 
@@ -92,48 +90,73 @@ export class ProdutoService {
 	}
 
 	async update(produto: Produto, foto: Express.Multer.File): Promise<Produto> {
-		if (!produto || !produto.id)
+		if (!produto?.id) {
 			throw new HttpException("Produto inválido!", HttpStatus.BAD_REQUEST)
+		}
 
+		// Verificar se o produto existe
 		await this.findById(produto.id)
 
-    if (foto) {
-			const fotoUrl = await this.imagekitService.handleImage({
-				file: foto,
-				recurso: "produto",
-				identificador: produto.id.toString(),
+		// Processar imagem se fornecida
+		const fotoUrl = await this.processarImagem(produto, foto)
+		if (fotoUrl) {
+			produto.foto = fotoUrl
+		}
+
+		// Buscar categoria e editora
+		const [categoria, editora] = await Promise.all([
+			this.categoriaService.findById(produto.categoria.id),
+			this.editoraService.findById(produto.editora.id),
+		])
+
+		produto.categoria = categoria
+		produto.editora = editora
+
+		// Usar QueryRunner para transação
+		const queryRunner = this.produtoRepository.manager.connection.createQueryRunner()
+		await queryRunner.connect()
+		await queryRunner.startTransaction()
+
+		try {
+			// 1. Atualizar dados básicos do produto
+			await queryRunner.manager.update(Produto, produto.id, {
+				titulo: produto.titulo,
+				descricao: produto.descricao,
+				preco: produto.preco,
+				desconto: produto.desconto,
+				isbn10: produto.isbn10,
+				isbn13: produto.isbn13,
+				paginas: produto.paginas,
+				idioma: produto.idioma,
+				foto: produto.foto,
+				categoria: { id: categoria.id },
+				editora: { id: editora.id },
 			})
-			if (fotoUrl) {
-				produto.foto = fotoUrl
-			}
+
+			// 2. Atualizar relacionamento com autores em uma única operação
+			const produtoRepository = queryRunner.manager.getRepository(Produto)
+			const produtoEntity = await produtoRepository.findOne({
+				where: { id: produto.id },
+				relations: { autores: true },
+			})
+
+			produtoEntity.autores = produto.autores || []
+			await produtoRepository.save(produtoEntity)
+
+			await queryRunner.commitTransaction()
+
+			// Retornar produto atualizado
+			return this.findById(produto.id)
+		} catch (error) {
+			await queryRunner.rollbackTransaction()
+			this.logger.error(`Erro ao atualizar produto: ${error.message}`, error.stack)
+			throw new HttpException(
+				`Erro ao atualizar produto: ${error.message}`,
+				HttpStatus.INTERNAL_SERVER_ERROR,
+			)
+		} finally {
+			await queryRunner.release()
 		}
-
-
-		// Busca e atribui as instâncias corretas
-		produto.categoria = await this.categoriaService.findById(produto.categoria.id)
-		produto.editora = await this.editoraService.findById(produto.editora.id)
-
-		// Remove os Autores Atuais
-		await this.removerAutoresProduto(produto.id)
-
-		// Adiciona os novos Autores
-		await this.adicionarAutoresProduto(produto.id, produto.autores)
-
-		// Cria o Objeto de Atualização dos dados do Produto
-		const updateData = {
-			titulo: produto.titulo,
-			preco: produto.preco,
-			desconto: produto.desconto,
-			isbn10: produto.isbn10,
-			isbn13: produto.isbn13,
-			foto: produto.foto,
-		}
-
-		// Atualiza os dados do Produto
-		await this.produtoRepository.update(produto.id, updateData)
-
-		// Retorna os dados atualizados
-		return this.findById(produto.id)
 	}
 
 	async delete(id: number): Promise<DeleteResult> {
@@ -146,35 +169,22 @@ export class ProdutoService {
 
 	// Métodos Auxiliares
 
-	async removerAutoresProduto(id: number): Promise<void> {
-		// Localiza todos os Autores do Produto
-		const existingAutores = await this.produtoRepository
-			.createQueryBuilder()
-			.relation(Produto, "autores")
-			.of(id)
-			.loadMany()
+	private async processarImagem(
+		produto: Produto,
+		foto: Express.Multer.File,
+	): Promise<string | null> {
+		if (!foto) return null
 
-		// Remove todos os Autores do Produto
-		if (existingAutores.length > 0) {
-			await this.produtoRepository
-				.createQueryBuilder()
-				.relation(Produto, "autores")
-				.of(id)
-				.remove(existingAutores)
+		try {
+			return await this.imagekitService.handleImage({
+				file: foto,
+				recurso: "produto",
+				identificador: produto.id.toString(),
+			})
+		} catch (error) {
+			this.logger.error(`Erro ao processar imagem: ${error.message}`, error.stack)
+			return null
 		}
 	}
 
-	async adicionarAutoresProduto(id: number, autores: Autor[]): Promise<void> {
-		// Valida os Autores antes de adicionar
-		if (autores && autores.length > 0) {
-			await this.autorService.validateAutores(autores)
-
-			// Adiciona os novos Autores
-			await this.produtoRepository
-				.createQueryBuilder()
-				.relation(Produto, "autores")
-				.of(id)
-				.add(autores)
-		}
-	}
 }

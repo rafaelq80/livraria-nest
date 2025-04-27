@@ -5,8 +5,6 @@ import { Role } from "../entities/role.entity"
 import { Usuario } from "../../usuario/entities/usuario.entity"
 import { HasId } from "../../types/hasid"
 
-
-
 @Injectable()
 export class RoleService {
 	constructor(
@@ -31,6 +29,20 @@ export class RoleService {
 		return role
 	}
 
+	async findManyByIds(ids: number[]): Promise<Map<number, Role>> {
+		if (!ids.length) return new Map()
+
+		const roles = await this.roleRepository.findBy({ id: In(ids) })
+
+		if (roles.length !== ids.length) {
+			const foundIds = roles.map((a) => a.id)
+			const missingIds = ids.filter((id) => !foundIds.includes(id))
+			throw new BadRequestException(`Roles não encontrados: ${missingIds.join(", ")}`)
+		}
+
+		return new Map(roles.map((autor) => [autor.id, autor]))
+	}
+
 	async create(role: Role): Promise<Role> {
 		if (!role) throw new BadRequestException("Dados do role inválidos")
 		return this.roleRepository.save(role)
@@ -47,53 +59,51 @@ export class RoleService {
 		await this.roleRepository.delete(id)
 	}
 
+	// Métodos Auxiliares
+
 	async processarRoles(usuario: Usuario): Promise<Usuario> {
-		// Se não tem roles, retorna array vazio
+		// Caso rápido: sem roles
 		if (!usuario.roles) return { ...usuario, roles: [] }
+
 		try {
-			// Verifica se a entrada é uma string e converte para objeto
-			const rolesData =
-				typeof usuario.roles === "string" ? JSON.parse(usuario.roles) : usuario.roles
-			
-			// Verifica se é um array
-			if (!Array.isArray(rolesData)) {
-				throw new BadRequestException("O campo roles deve ser um array")
-			}
-			
-			// Extrai os IDs válidos
+			// Normalizar entrada para garantir um array
+			const rolesData = this.normalizarRolesInput(usuario.roles)
+
+			// Se vazio após normalização, retornar array vazio
+			if (!rolesData.length) return { ...usuario, roles: [] }
+
+			// Extrair IDs válidos
 			const roleIds = this.extrairIdsValidos(rolesData)
-			
-			// Busca os roles completos no banco de dados
-			const roles = await this.roleRepository.findBy({
-				id: In(roleIds) // Usando o operador In do TypeORM
-			})
-			
-			// Verifica se todos os roles foram encontrados
-			if (roles.length !== roleIds.length) {
-				throw new BadRequestException("Algumas roles não foram encontradas")
-			}
-			
-			// Valida os roles encontrados
-			await this.validateRoles(roles)
-			
+
+			// Caso não existam IDs válidos
+			if (!roleIds.length) return { ...usuario, roles: [] }
+
+			// Buscar todos os roles de uma vez e mapear
+			const rolesMap = await this.findManyByIds(roleIds)
+			const roles = roleIds.map((id) => rolesMap.get(id))
+
 			return { ...usuario, roles }
 		} catch (error) {
 			if (error instanceof HttpException) throw error
-			throw new BadRequestException("Formato inválido para o campo roles")
+			throw new BadRequestException(`Formato inválido para o campo roles: ${error.message}`)
 		}
 	}
 
-	async validateRoles(roles: Role[]): Promise<void> {
-		if (!roles || !Array.isArray(roles)) {
-			throw new BadRequestException("Lista de roles inválida")
+	private normalizarRolesInput(roles: unknown): unknown[] {
+		if (Array.isArray(roles)) return roles
+
+		if (typeof roles === "string") {
+			try {
+				const parsed = JSON.parse(roles)
+				return Array.isArray(parsed) ? parsed : []
+			} catch {
+				return []
+			}
 		}
 
-		for (const role of roles) {
-			await this.findById(role.id)
-		}
+		return []
 	}
 
-	// Extrai ids válidos (números > 0) de diversos formatos possíveis
 	private extrairIdsValidos(items: unknown[]): number[] {
 		return items
 			.map((item) => {
