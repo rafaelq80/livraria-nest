@@ -12,10 +12,10 @@ export class ProdutoService {
 
 	constructor(
 		@InjectRepository(Produto)
-		private produtoRepository: Repository<Produto>,
-		private categoriaService: CategoriaService,
-		private editoraService: EditoraService,
-		private imagekitService: ImageKitService,
+		private readonly produtoRepository: Repository<Produto>,
+		private readonly categoriaService: CategoriaService,
+		private readonly editoraService: EditoraService,
+		private readonly imagekitService: ImageKitService,
 	) {}
 
 	async findAll(): Promise<Produto[]> {

@@ -13,8 +13,8 @@ import { UsuarioAutenticado } from "../types/usuarioautenticado"
 @Controller("/usuarios")
 export class SecurityController {
 	constructor(
-        private securityService: SecurityService,
-        private recuperarSenhaService: RecuperarSenhaService
+        private readonly securityService: SecurityService,
+        private readonly recuperarSenhaService: RecuperarSenhaService
     ) {}
 
 	@UseGuards(LocalAuthGuard)

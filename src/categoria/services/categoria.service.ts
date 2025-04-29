@@ -7,7 +7,7 @@ import { Categoria } from "../entities/categoria.entity"
 export class CategoriaService {
 	constructor(
 		@InjectRepository(Categoria)
-		private categoriaRepository: Repository<Categoria>,
+		private readonly categoriaRepository: Repository<Categoria>,
 	) {}
 
 	async findAll(): Promise<Categoria[]> {
@@ -59,7 +59,7 @@ export class CategoriaService {
 	}
 
 	async update(categoria: Categoria): Promise<Categoria> {
-		if (!categoria || !categoria.id)
+		if (!categoria?.id)
 			throw new HttpException("Dados da categoria inválidos", HttpStatus.BAD_REQUEST)
 
 		await this.findById(categoria.id)

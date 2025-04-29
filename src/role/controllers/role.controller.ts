@@ -21,7 +21,7 @@ import { ApiTags, ApiBearerAuth } from "@nestjs/swagger"
 @ApiTags('Role')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesAuthGuard)
-@Roles("admin") // Somente admnistradores possuem acesso
+@Roles("admin") 
 @Controller("/roles")
 export class RoleController {
 

@@ -9,7 +9,7 @@ import { HasId } from "../../types/hasid"
 export class RoleService {
 	constructor(
 		@InjectRepository(Role)
-		private roleRepository: Repository<Role>,
+		private readonly roleRepository: Repository<Role>,
 	) {}
 
 	async findAll(): Promise<Role[]> {
@@ -49,10 +49,11 @@ export class RoleService {
 	}
 
 	async update(role: Role): Promise<Role> {
-		if (!role || !role.id) throw new BadRequestException("Dados do role inválidos")
-		await this.findById(role.id)
-		return this.roleRepository.save(role)
-	}
+		if (!role?.id) throw new BadRequestException("Dados do role inválidos");
+		await this.findById(role.id);
+		return this.roleRepository.save(role);
+	  }
+	  
 
 	async delete(id: number): Promise<void> {
 		await this.findById(id)

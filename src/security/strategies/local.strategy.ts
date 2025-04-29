@@ -7,9 +7,13 @@ import { UsuarioAutenticado } from "../types/usuarioautenticado"
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
 	constructor(private readonly securityService: SecurityService) {
+		
+		const USUARIO = "usuario"
+		const SENHA = "senha"
+		
 		super({
-			usernameField: "usuario",
-			passwordField: "senha",
+			usernameField: USUARIO,
+			passwordField: SENHA,
 			session: false,
 		})
 	}

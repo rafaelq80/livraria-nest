@@ -20,5 +20,9 @@
         "terminal.ansiRed": "#C94922",
         "terminal.ansiWhite": "#979DB4",
         "terminal.ansiYellow": "#C08B30"
+    },
+    "sonarlint.connectedMode.project": {
+        "connectionId": "http-localhost-9000",
+        "projectKey": "livraria"
     }
 }

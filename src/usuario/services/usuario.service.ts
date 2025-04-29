@@ -1,6 +1,6 @@
 ﻿import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import { Repository } from "typeorm"
+import { QueryRunner, Repository } from "typeorm"
 import { ImageKitService } from "../../imagekit/services/imagekit.service"
 import { RoleService } from "../../role/services/role.service"
 import { Bcrypt } from "../../security/bcrypt/bcrypt"
@@ -13,11 +13,11 @@ export class UsuarioService {
 
 	constructor(
 		@InjectRepository(Usuario)
-		private usuarioRepository: Repository<Usuario>,
+		private readonly usuarioRepository: Repository<Usuario>,
 		private readonly roleService: RoleService,
-		private bcrypt: Bcrypt,
-		private sendmailService: SendmailService,
-		private imagekitService: ImageKitService,
+		private readonly bcrypt: Bcrypt,
+		private readonly sendmailService: SendmailService,
+		private readonly imagekitService: ImageKitService,
 	) {}
 
 	async findByUsuario(usuario: string): Promise<Usuario | undefined> {
@@ -55,53 +55,34 @@ export class UsuarioService {
 	}
 
 	async create(usuario: Usuario, foto: Express.Multer.File): Promise<Usuario> {
-		// Verificar existência do usuário fora da transação
-		if (await this.findByUsuario(usuario.usuario)) {
-			throw new HttpException("O Usuario ja existe!", HttpStatus.BAD_REQUEST)
-		}
+		await this.verificarUsuarioDuplicado(usuario.usuario)
 
-		// Criptografar senha
 		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
 
-		// Processar imagem
 		const fotoUrl = await this.processarImagem(usuario, foto)
 		if (fotoUrl) {
 			usuario.foto = fotoUrl
 		}
 
-		// Usar QueryRunner para transação
 		const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
 
 		try {
 			await queryRunner.connect()
 			await queryRunner.startTransaction()
 
-			// Salvar usuário com seus roles
 			const saveUsuario = await queryRunner.manager.save(Usuario, usuario)
 
 			await queryRunner.commitTransaction()
 
-			// Enviar email após a transação bem-sucedida
 			await this.sendmailService
 				.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
 				.catch((error) => {
 					this.logger.warn(`Erro ao enviar email: ${error.message}`, error.stack)
-					// Não falha a operação se o email falhar
 				})
 
 			return saveUsuario
 		} catch (error) {
-			if (queryRunner.isTransactionActive) {
-				await queryRunner.rollbackTransaction()
-			}
-
-			this.logger.error(`Erro ao criar usuario: ${error.message}`, error.stack)
-			throw new HttpException(
-				`Erro ao criar usuario: ${error.message}`,
-				error instanceof HttpException
-					? error.getStatus()
-					: HttpStatus.INTERNAL_SERVER_ERROR,
-			)
+			await this.tratarErro(queryRunner, error)
 		} finally {
 			await queryRunner.release()
 		}
@@ -111,80 +92,30 @@ export class UsuarioService {
 		if (!usuario?.id) {
 			throw new HttpException("Usuário inválido!", HttpStatus.BAD_REQUEST)
 		}
-	
+
 		const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
-	
+
 		try {
-			// Buscar dados atuais do usuário
 			const usuarioAtual = await this.findById(usuario.id)
-			
-			// Verificar se o novo email já existe e pertence a outro usuário
-			const buscaUsuario = await this.findByUsuario(usuario.usuario)
-			if (buscaUsuario && buscaUsuario.id !== usuarioAtual.id) {
-				throw new HttpException("Usuário (e-mail) já Cadastrado!", HttpStatus.BAD_REQUEST)
-			}
-	
-			// Só criptografar senha se for diferente da armazenada
-			if (
-				usuario.senha &&
-				!(await this.bcrypt.compararSenhas(usuario.senha, usuarioAtual.senha))
-			) {
-				usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
-			} else {
-				usuario.senha = usuarioAtual.senha // Manter senha atual
-			}
-	
-			// Processar imagem se fornecida
-			const fotoUrl = await this.processarImagem(usuario, foto)
-			if (fotoUrl) {
-				usuario.foto = fotoUrl
-			} else if (!usuario.foto) {
-				usuario.foto = usuarioAtual.foto // Manter foto atual se não fornecida
-			}
-	
-			// Iniciar transação
+
+			await this.validarUsuarioExistente(usuario, usuarioAtual)
+			usuario.senha = await this.atualizarSenhaSeNecessario(usuario, usuarioAtual)
+			usuario.foto = await this.atualizarFotoSeNecessario(usuario, foto, usuarioAtual)
+
 			await queryRunner.connect()
 			await queryRunner.startTransaction()
-	
-			// Preparar objeto de atualização apenas com campos fornecidos
-			const updateData: Partial<Usuario> = {}
-			if (usuario.nome !== undefined) updateData.nome = usuario.nome
-			if (usuario.usuario !== undefined) updateData.usuario = usuario.usuario
-			if (usuario.senha !== undefined) updateData.senha = usuario.senha
-			if (usuario.foto !== undefined) updateData.foto = usuario.foto
-	
-			// Executar atualização
+
+			const updateData = this.prepararDadosAtualizacao(usuario)
 			await queryRunner.manager.update(Usuario, usuario.id, updateData)
-	
-			// Atualizar relações apenas se roles foram fornecidos
-			if (usuario.roles !== undefined) {
-				const usuarioEntity = await queryRunner.manager.findOne(Usuario, {
-					where: { id: usuario.id },
-					relations: { roles: true },
-				})
-	
-				usuarioEntity.roles = usuario.roles || []
-				await queryRunner.manager.save(Usuario, usuarioEntity)
-			}
-	
+
+			await this.atualizarRolesSeNecessario(queryRunner, usuario)
+
 			await queryRunner.commitTransaction()
-	
-			// Retornar usuario atualizado
+
 			return this.findById(usuario.id)
 		} catch (error) {
-			if (queryRunner.isTransactionActive) {
-				await queryRunner.rollbackTransaction()
-			}
-	
-			this.logger.error(`Erro ao atualizar usuario: ${error.message}`, error.stack)
-			throw new HttpException(
-				`Erro ao atualizar usuario: ${error.message}`,
-				error instanceof HttpException
-					? error.getStatus()
-					: HttpStatus.INTERNAL_SERVER_ERROR,
-			)
+			await this.tratarErro(queryRunner, error)
 		} finally {
-			// Release de recursos independente do resultado
 			await queryRunner.release()
 		}
 	}
@@ -198,6 +129,83 @@ export class UsuarioService {
 	}
 
 	// Métodos Auxiliares
+
+	private async verificarUsuarioDuplicado(usuario: string): Promise<void> {
+		const existeUsuario = await this.findByUsuario(usuario)
+		if (existeUsuario) {
+			throw new HttpException("O Usuário já existe!", HttpStatus.BAD_REQUEST)
+		}
+	}
+
+	private async validarUsuarioExistente(usuario: Usuario, usuarioAtual: Usuario): Promise<void> {
+		const buscaUsuario = await this.findByUsuario(usuario.usuario)
+		if (buscaUsuario && buscaUsuario.id !== usuarioAtual.id) {
+			throw new HttpException("Usuário (e-mail) já Cadastrado!", HttpStatus.BAD_REQUEST)
+		}
+	}
+
+	private async atualizarSenhaSeNecessario(
+		usuario: Usuario,
+		usuarioAtual: Usuario,
+	): Promise<string> {
+		if (
+			usuario.senha &&
+			!(await this.bcrypt.compararSenhas(usuario.senha, usuarioAtual.senha))
+		) {
+			return this.bcrypt.criptografarSenha(usuario.senha)
+		}
+		return usuarioAtual.senha
+	}
+
+	private async atualizarFotoSeNecessario(
+		usuario: Usuario,
+		foto: Express.Multer.File | undefined,
+		usuarioAtual: Usuario,
+	): Promise<string | undefined> {
+		const fotoUrl = await this.processarImagem(usuario, foto)
+		if (fotoUrl) return fotoUrl
+		return usuario.foto ?? usuarioAtual.foto
+	}
+
+	private prepararDadosAtualizacao(usuario: Usuario): Partial<Usuario> {
+		const updateData: Partial<Usuario> = {}
+		if (usuario.nome !== undefined) updateData.nome = usuario.nome
+		if (usuario.usuario !== undefined) updateData.usuario = usuario.usuario
+		if (usuario.senha !== undefined) updateData.senha = usuario.senha
+		if (usuario.foto !== undefined) updateData.foto = usuario.foto
+		return updateData
+	}
+
+	private async atualizarRolesSeNecessario(
+		queryRunner: QueryRunner,
+		usuario: Usuario,
+	): Promise<void> {
+		if (usuario.roles !== undefined) {
+			const usuarioEntity = await queryRunner.manager.findOne(Usuario, {
+				where: { id: usuario.id },
+				relations: { roles: true },
+			})
+			if (usuarioEntity) {
+				usuarioEntity.roles = usuario.roles || []
+				await queryRunner.manager.save(Usuario, usuarioEntity)
+			}
+		}
+	}
+
+	private async tratarErro(queryRunner: QueryRunner, error: unknown): Promise<void> {
+		if (queryRunner.isTransactionActive) {
+			await queryRunner.rollbackTransaction()
+		}
+
+		this.logger.error(
+			`Erro ao atualizar usuario: ${(error as Error).message}`,
+			(error as Error).stack,
+		)
+		throw new HttpException(
+			`Erro ao atualizar usuario: ${(error as Error).message}`,
+			error instanceof HttpException ? error.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR,
+		)
+	}
 
 	private async processarImagem(
 		usuario: Usuario,

@@ -9,7 +9,7 @@ import { HasId } from "../../types/hasid"
 export class AutorService {
 	constructor(
 		@InjectRepository(Autor)
-		private autorRepository: Repository<Autor>,
+		private readonly autorRepository: Repository<Autor>,
 	) {}
 
 	async findAll(): Promise<Autor[]> {
@@ -75,7 +75,7 @@ export class AutorService {
 	}
 
 	async update(autor: Autor): Promise<Autor> {
-		if (!autor || !autor.id) throw new HttpException("Autor inválido!", HttpStatus.BAD_REQUEST)
+		if (!autor?.id) throw new HttpException("Autor inválido!", HttpStatus.BAD_REQUEST)
 
 		await this.findById(autor.id)
 
@@ -95,11 +95,13 @@ export class AutorService {
 
 		try {
 			// Padronizar o formato de entrada
-			const autoresData = Array.isArray(produto.autores)
-				? produto.autores
-				: typeof produto.autores === "string"
-					? JSON.parse(produto.autores)
-					: []
+			let autoresData: unknown[] = []
+
+			if (Array.isArray(produto.autores)) {
+				autoresData = produto.autores as unknown[]
+			} else if (typeof produto.autores === "string") {
+				autoresData = JSON.parse(produto.autores) as unknown[]
+			}
 
 			// Extrair IDs válidos
 			const autorIds = this.extrairIdsValidos(autoresData)

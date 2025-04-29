@@ -7,7 +7,7 @@ import { Editora } from '../entities/editora.entity';
 export class EditoraService {
   constructor(
     @InjectRepository(Editora)
-    private editoraRepository: Repository<Editora>,
+    private readonly editoraRepository: Repository<Editora>,
   ) {}
 
   async findAll(): Promise<Editora[]> {
@@ -65,7 +65,7 @@ export class EditoraService {
 
   async update(editora: Editora): Promise<Editora> {
     
-    if (!editora || !editora.id)
+    if (!editora?.id)
       throw new HttpException('Editora inválido!', HttpStatus.BAD_REQUEST);
 
     await this.findById(editora.id);
