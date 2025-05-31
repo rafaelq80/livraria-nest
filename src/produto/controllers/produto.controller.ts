@@ -80,7 +80,7 @@ export class ProdutoController {
 		@UploadedFile(
 			new ParseFilePipe({
 				validators: [
-					new FileTypeValidator({ fileType: /(jpg|jpeg|png|webp)$/ }),
+					new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
 					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
 				],
 				fileIsRequired: false

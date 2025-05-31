@@ -68,13 +68,7 @@ export class ProdutoService {
 	}
 
 	async create(produto: Produto, foto: Express.Multer.File): Promise<Produto> {
-		
-		// Processar imagem se fornecida
-		const fotoUrl = await this.processarImagem(produto, foto)
-		if (fotoUrl) {
-			produto.foto = fotoUrl
-		}
-		
+				
 		// Buscar categoria e editora
 		const [categoria, editora] = await Promise.all([
 			this.categoriaService.findById(produto.categoria.id),
@@ -86,6 +80,12 @@ export class ProdutoService {
 
 		const saveProduto = await this.produtoRepository.save(produto)
 
+		// Processar imagem se fornecida
+		const fotoUrl = await this.processarImagem(produto, foto)
+		if (fotoUrl) {
+			produto.foto = fotoUrl
+		}
+		
 		return saveProduto
 	}
 
