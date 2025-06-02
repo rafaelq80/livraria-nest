@@ -1,5 +1,3 @@
-import { Repository } from "typeorm"
-import { Produto } from "../../src/produto/entities/produto.entity"
 import { EntityMocks } from "./entity-mocks.helper"
 import { AutorMock, CategoriaMock, EditoraMock, MockRepository } from "./types.helper"
 
@@ -44,15 +42,4 @@ export class RepositoryMocks {
 		return this.createRepositoryMock(autores)
 	}
 
-	// Mock específico para Produto
-	  static createProdutoRepositoryMock(
-    produtos: Produto[] = []
-  ): Partial<jest.Mocked<Repository<Produto>>> {
-    return {
-      find: jest.fn().mockResolvedValue(produtos),
-      findOne: jest.fn().mockResolvedValue(produtos[0] || null),
-      save: jest.fn().mockImplementation((entity) => Promise.resolve({ id: 99, ...entity })),
-      // outros métodos se necessário
-    };
-  }
 }

@@ -93,35 +93,3 @@ export type AutorMock = {
   updatedAt: Date;
   produtos: ProdutoMock[];
 };
-
-// DTOs para requisições
-export interface CreateProdutoDto {
-  titulo: string;
-  descricao?: string;
-  preco: number;
-  desconto: number;
-  foto?: string;
-  paginas?: number;
-  idioma?: string;
-  isbn10: string;
-  isbn13: string;
-  categoriaId: number;
-  editoraId: number;
-  autoresIds: number[]; // Array de IDs dos autores
-}
-
-export interface UpdateProdutoDto {
-  id: number;
-  titulo: string;
-  descricao?: string;
-  preco: number;
-  desconto: number;
-  foto?: string;
-  paginas?: number;
-  idioma?: string;
-  isbn10: string;
-  isbn13: string;
-  categoriaId?: number;
-  editoraId?: number;
-  autoresIds?: number[]; // Array de IDs dos autores
-}
