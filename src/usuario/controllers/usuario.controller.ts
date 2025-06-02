@@ -21,6 +21,8 @@ import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard"
 import { Usuario } from "../entities/usuario.entity"
 import { UsuarioService } from "../services/usuario.service"
 import { RoleService } from "./../../role/services/role.service"
+import { CriarUsuarioDto } from "../dto/criarusuario.dto"
+import { plainToInstance } from "class-transformer"
 
 @ApiTags("Usuário")
 @ApiBearerAuth()
@@ -46,9 +48,33 @@ export class UsuarioController {
 	}
 
 	@Post("/cadastrar")
-	@UseInterceptors(FileInterceptor("foto"))
+	@UseInterceptors(FileInterceptor("fotoFile"))
 	@HttpCode(HttpStatus.CREATED)
 	async create(
+		@Body()  usuarioDto: CriarUsuarioDto,
+		@UploadedFile(
+			new ParseFilePipe({
+				validators: [
+					new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
+					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+				],
+				fileIsRequired: false
+			}),
+		)
+		fotoFile?: Express.Multer.File,
+	): Promise<Usuario> {
+		
+		const usuario = plainToInstance(Usuario, usuarioDto)
+		const usuarioRoles = await this.roleService.processarRoles(usuario)
+
+		return await this.usuarioService.create(usuarioRoles, fotoFile)
+	}
+
+	@UseGuards(JwtAuthGuard)
+	@Put("/atualizar")
+	@UseInterceptors(FileInterceptor("fotoFile"))
+	@HttpCode(HttpStatus.OK)
+	async update(
 		@Body() usuario: Usuario,
 		@UploadedFile(
 			new ParseFilePipe({
@@ -56,35 +82,13 @@ export class UsuarioController {
 					new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
 					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
 				],
-			}),
-		)
-		foto: Express.Multer.File,
-	): Promise<Usuario> {
-		
-		const usuarioRoles = await this.roleService.processarRoles(usuario)
-
-		return await this.usuarioService.create(usuarioRoles, foto)
-	}
-
-	@UseGuards(JwtAuthGuard)
-	@Put("/atualizar")
-	@UseInterceptors(FileInterceptor("foto"))
-	@HttpCode(HttpStatus.OK)
-	async update(
-		@Body() usuario: Usuario,
-		@UploadedFile(
-			new ParseFilePipe({
-				validators: [
-					new FileTypeValidator({ fileType: /(jpg|jpeg|png|webp)$/ }),
-					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-				],
 				fileIsRequired: false
 			}),
 		)
-		foto?: Express.Multer.File,
+		fotoFile?: Express.Multer.File,
 	): Promise<Usuario> {
 		const usuarioRoles = await this.roleService.processarRoles(usuario)
 
-		return await this.usuarioService.update(usuarioRoles, foto)
+		return await this.usuarioService.update(usuarioRoles, fotoFile)
 	}
 }

@@ -50,9 +50,10 @@ export class ProdutoController {
 	findByTitulo(@Param("titulo") titulo: string): Promise<Produto[]> {
 		return this.produtoService.findByTitulo(titulo)
 	}
+
 	@UseGuards(JwtAuthGuard)
 	@Post()
-	@UseInterceptors(FileInterceptor("foto"))
+	@UseInterceptors(FileInterceptor("fotoFile"))
 	@HttpCode(HttpStatus.CREATED)
 	async create(
 		@Body() produto: Produto,
@@ -60,20 +61,21 @@ export class ProdutoController {
 			new ParseFilePipe({
 				validators: [
 					new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
-					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
 				],
+				fileIsRequired: false,
 			}),
 		)
-		foto: Express.Multer.File,
+		fotoFile: Express.Multer.File,
 	): Promise<Produto> {
-		const produtoAutores = await this.autorService.processarAutores(produto)
-
-		return this.produtoService.create(produtoAutores, foto)
+		const autores = await this.autorService.processarAutores(produto)
+		produto.autores = autores
+		return this.produtoService.create(produto, fotoFile)
 	}
 
 	@UseGuards(JwtAuthGuard)
 	@Put()
-	@UseInterceptors(FileInterceptor("foto"))
+	@UseInterceptors(FileInterceptor("fotoFile"))
 	@HttpCode(HttpStatus.OK)
 	async update(
 		@Body() produto: Produto,
@@ -81,16 +83,16 @@ export class ProdutoController {
 			new ParseFilePipe({
 				validators: [
 					new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
-					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
 				],
-				fileIsRequired: false
+				fileIsRequired: false,
 			}),
 		)
-		foto?: Express.Multer.File,
+		fotoFile?: Express.Multer.File,
 	): Promise<Produto> {
-		const produtoAutores = await this.autorService.processarAutores(produto)
-
-		return this.produtoService.update(produtoAutores, foto)
+		const autores = await this.autorService.processarAutores(produto)
+		produto.autores = autores
+		return this.produtoService.update(produto, fotoFile)
 	}
 
 	@UseGuards(JwtAuthGuard)

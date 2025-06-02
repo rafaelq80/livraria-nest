@@ -54,41 +54,49 @@ export class UsuarioService {
 		return usuario
 	}
 
-	async create(usuario: Usuario, foto: Express.Multer.File): Promise<Usuario> {
-		await this.verificarUsuarioDuplicado(usuario.usuario)
+	async create(usuario: Usuario, fotoFile: Express.Multer.File): Promise<Usuario> {
+    await this.verificarUsuarioDuplicado(usuario.usuario)
 
-		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
+    usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
 
-		const fotoUrl = await this.processarImagem(usuario, foto)
-		if (fotoUrl) {
-			usuario.foto = fotoUrl
-		}
+     // Buscar roles usando findManyByIds
+    if (usuario.roles && usuario.roles.length > 0) {
+        const roleIds = usuario.roles.map(r => r.id)
+        const rolesMap = await this.roleService.findManyByIds(roleIds)
+        usuario.roles = roleIds.map(id => rolesMap.get(id))
+    }
+	
+    const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
 
-		const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
+    try {
+        await queryRunner.connect()
+        await queryRunner.startTransaction()
 
-		try {
-			await queryRunner.connect()
-			await queryRunner.startTransaction()
+        const saveUsuario = await queryRunner.manager.save(Usuario, usuario)
 
-			const saveUsuario = await queryRunner.manager.save(Usuario, usuario)
+        const fotoUrl = await this.processarImagem(saveUsuario, fotoFile)
+        if (fotoUrl) {
+            saveUsuario.foto = fotoUrl
+            await queryRunner.manager.save(Usuario, saveUsuario)
+        }
 
-			await queryRunner.commitTransaction()
+        await queryRunner.commitTransaction()
 
-			await this.sendmailService
-				.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
-				.catch((error) => {
-					this.logger.warn(`Erro ao enviar email: ${error.message}`, error.stack)
-				})
+        await this.sendmailService
+            .sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
+            .catch((error) => {
+                this.logger.warn(`Erro ao enviar email: ${error.message}`, error.stack)
+            })
 
-			return saveUsuario
-		} catch (error) {
-			await this.tratarErro(queryRunner, error)
-		} finally {
-			await queryRunner.release()
-		}
-	}
+        return saveUsuario
+    } catch (error) {
+        await this.tratarErro(queryRunner, error)
+    } finally {
+        await queryRunner.release()
+    }
+}
 
-	async update(usuario: Usuario, foto?: Express.Multer.File): Promise<Usuario> {
+	async update(usuario: Usuario, fotoFile?: Express.Multer.File): Promise<Usuario> {
 		if (!usuario?.id) {
 			throw new HttpException("Usuário inválido!", HttpStatus.BAD_REQUEST)
 		}
@@ -100,7 +108,7 @@ export class UsuarioService {
 
 			await this.validarUsuarioExistente(usuario, usuarioAtual)
 			usuario.senha = await this.atualizarSenhaSeNecessario(usuario, usuarioAtual)
-			usuario.foto = await this.atualizarFotoSeNecessario(usuario, foto, usuarioAtual)
+			usuario.foto = await this.atualizarFotoSeNecessario(usuario, fotoFile, usuarioAtual)
 
 			await queryRunner.connect()
 			await queryRunner.startTransaction()
@@ -159,10 +167,10 @@ export class UsuarioService {
 
 	private async atualizarFotoSeNecessario(
 		usuario: Usuario,
-		foto: Express.Multer.File | undefined,
+		fotoFile: Express.Multer.File | undefined,
 		usuarioAtual: Usuario,
 	): Promise<string | undefined> {
-		const fotoUrl = await this.processarImagem(usuario, foto)
+		const fotoUrl = await this.processarImagem(usuario, fotoFile)
 		if (fotoUrl) return fotoUrl
 		return usuario.foto ?? usuarioAtual.foto
 	}

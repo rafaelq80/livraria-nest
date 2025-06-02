@@ -1,8 +1,26 @@
+import { FindManyOptions, FindOneOptions } from "typeorm";
+
 // Tipos compartilhados para testes E2E
 
+export interface ImageKitServiceMock {
+  handleImage: jest.MockedFunction<(file: Express.Multer.File) => Promise<string>>;
+  uploadImage: jest.MockedFunction<(buffer: Buffer, fileName: string) => Promise<ImageKitUploadResponse>>;
+  processImage: jest.MockedFunction<(buffer: Buffer, maxWidth?: number, quality?: number) => Promise<Buffer>>;
+  deleteImage: jest.MockedFunction<(fileId: string) => Promise<boolean>>;
+  updateImage?: jest.MockedFunction<(fileId: string, buffer: Buffer) => Promise<string>>;
+}
+
+export interface ImageKitUploadResponse {
+  url: string;
+  fileId: string;
+  name: string;
+  size?: number;
+  filePath?: string;
+}
+
 export interface MockRepository<T = unknown> {
-  find: jest.MockedFunction<() => Promise<T[]>>;
-  findOne: jest.MockedFunction<() => Promise<T | null>>;
+  find: jest.MockedFunction<(options?: FindManyOptions<T>) => Promise<T[]>>;
+  findOne: jest.MockedFunction<(options?: FindOneOptions<T>) => Promise<T | null>>;
   save: jest.MockedFunction<(entity: Partial<T>) => Promise<T>>;
   delete: jest.MockedFunction<(id: number | string) => Promise<{ affected: number }>>;
   create: jest.MockedFunction<(entity: Partial<T>) => T>;
@@ -21,6 +39,7 @@ export interface CommonMocks {
   sendmailService: {
     enviarEmailConfirmacao: jest.MockedFunction<() => Promise<void>>;
   };
+  imageKitService: ImageKitServiceMock;
 }
 
 export interface TestConfigOptions {
@@ -30,25 +49,6 @@ export interface TestConfigOptions {
 }
 
 // Tipos específicos das entidades baseados nos mocks
-export type CategoriaMock = {
-  id: number;
-  tipo: string;
-  produto: unknown[];
-};
-
-export type EditoraMock = {
-  id: number;
-  nome: string;
-  produto: unknown[];
-};
-
-export type AutorMock = {
-  id: number;
-  nome: string;
-  nacionalidade: string
-  produtos: ProdutoMock[];
-};
-
 export type ProdutoMock = {
   id: number;
   titulo: string;
@@ -60,9 +60,38 @@ export type ProdutoMock = {
   idioma?: string;
   isbn10: string;
   isbn13: string;
+  createdAt: Date;
+  updatedAt: Date;
   categoria: CategoriaMock;
   editora: EditoraMock;
   autores: AutorMock[];
+  precoComDesconto(): number;
+  temDesconto(): boolean;
+};
+
+export type CategoriaMock = {
+  id: number;
+  tipo: string;
+  createdAt: Date;
+  updatedAt: Date;
+  produtos: ProdutoMock[];
+};
+
+export type EditoraMock = {
+  id: number;
+  nome: string;
+  createdAt: Date;
+  updatedAt: Date;
+  produtos: ProdutoMock[];
+};
+
+export type AutorMock = {
+  id: number;
+  nome: string;
+  nacionalidade: string;
+  createdAt: Date;
+  updatedAt: Date;
+  produtos: ProdutoMock[];
 };
 
 // DTOs para requisições

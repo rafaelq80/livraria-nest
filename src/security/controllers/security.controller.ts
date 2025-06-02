@@ -20,8 +20,8 @@ export class SecurityController {
 	@UseGuards(LocalAuthGuard)
 	@HttpCode(HttpStatus.OK)
 	@Post("/logar")
-	login(@Body() usuario: UsuarioLoginDto): Promise<UsuarioAutenticado> {
-		return this.securityService.login(usuario)
+	login(@Body() usuarioLoginDto: UsuarioLoginDto): Promise<UsuarioAutenticado> {
+		return this.securityService.login(usuarioLoginDto)
 	}
 
 	@Post("/recuperarsenha")

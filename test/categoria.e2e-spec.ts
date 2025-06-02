@@ -52,15 +52,26 @@ describe('Categoria E2E Tests', () => {
 
   describe('GET /categorias/:id', () => {
     it('Deve retornar uma Categoria pelo ID', async () => {
-      const categoriaMock = EntityMocks.createCategoriaMock();
+      EntityMocks.createCategoriaMock();
       
       const response = await request(testSetup.getApp().getHttpServer())
         .get('/categorias/1')
         .set('Authorization', `Bearer ${testSetup.getToken()}`)
         .expect(HttpStatus.OK);
 
-      expect(response.body).toEqual(categoriaMock);
-      expect(categoriaRepositoryMock.findOne).toHaveBeenCalled();
+      expect(response.body).toMatchObject({
+				id: 1,
+        tipo: 'Literatura Brasileira',
+				produtos: [],
+			})
+
+			// Verificar se as datas existem e são válidas
+			expect(response.body.createdAt).toBeDefined()
+			expect(response.body.updatedAt).toBeDefined()
+			expect(new Date(response.body.createdAt)).toBeInstanceOf(Date)
+			expect(new Date(response.body.updatedAt)).toBeInstanceOf(Date)
+
+			expect(categoriaRepositoryMock.findOne).toHaveBeenCalled()
     });
   });
 

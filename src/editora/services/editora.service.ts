@@ -13,7 +13,7 @@ export class EditoraService {
   async findAll(): Promise<Editora[]> {
     return await this.editoraRepository.find({
       relations: {
-        produto: true,
+        produtos: true,
       },
       order: {
         nome: 'ASC',
@@ -31,7 +31,7 @@ export class EditoraService {
         id,
       },
       relations: {
-        produto: true,
+        produtos: true,
       },
     });
 
@@ -47,7 +47,7 @@ export class EditoraService {
         nome: ILike(`%${nome.trim()}%`),
       },
       relations: {
-        produto: true,
+        produtos: true,
       },
       order: {
         nome: 'ASC',

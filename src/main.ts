@@ -19,11 +19,7 @@ async function bootstrap() {
 
   process.env.TZ  = 'America/Sao_Paulo';
 
-  app.useGlobalPipes(new ValidationPipe({
-    transform: true, // Isso é essencial para os @Transform funcionarem
-    whitelist: true,
-    forbidNonWhitelisted: true,
-  }));
+  app.useGlobalPipes(new ValidationPipe());
   app.enableCors();
 
   await app.listen(process.env.PORT ?? 4000);
