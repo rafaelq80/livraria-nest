@@ -224,7 +224,7 @@ export class UsuarioService {
 		try {
 			return await this.imagekitService.handleImage({
 				file: foto,
-				recurso: "produto",
+				recurso: "usuario",
 				identificador: usuario.id.toString(),
 			})
 		} catch (error) {
