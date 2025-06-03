@@ -1,10 +1,10 @@
-import { HttpStatus, BadRequestException, NotFoundException } from "@nestjs/common"
+import { BadRequestException, HttpStatus, NotFoundException } from "@nestjs/common"
 import * as request from "supertest"
-import { Autor } from "../src/autor/entities/autor.entity"
 import { AutorController } from "../src/autor/controllers/autor.controller"
+import { Autor } from "../src/autor/entities/autor.entity"
 import { AutorService } from "../src/autor/services/autor.service"
-import { BaseTestHelper } from "./helpers/base-test.helper"
 import { ProdutoMockFactory } from "./factories/produto-mock.factory"
+import { BaseTestHelper } from "./helpers/base-test.helper"
 
 interface AutorCreateDto {
 	nome: string
@@ -93,7 +93,6 @@ describe("Autor E2E Tests", () => {
 				produtos: [],
 			})
 
-			// Verificar se as datas existem e são válidas
 			expect(response.body.createdAt).toBeDefined()
 			expect(response.body.updatedAt).toBeDefined()
 			expect(new Date(response.body.createdAt)).toBeInstanceOf(Date)
@@ -120,9 +119,9 @@ describe("Autor E2E Tests", () => {
 	describe("POST /autores", () => {
 		it("Deve criar um Autor", async () => {
 			const novoAutor: AutorCreateDto = { nome: "Novo Autor" }
-			const autorCriado = ProdutoMockFactory.createMockAutor({ 
-				id: 2, 
-				nome: novoAutor.nome 
+			const autorCriado = ProdutoMockFactory.createMockAutor({
+				id: 2,
+				nome: novoAutor.nome,
 			})
 
 			mockAutorService.create.mockResolvedValue(autorCriado)
@@ -139,10 +138,7 @@ describe("Autor E2E Tests", () => {
 		})
 
 		it("Deve retornar BAD_REQUEST (400) se o nome for null", async () => {
-			// Configurar o mock para rejeitar com uma BadRequestException do NestJS
-			mockAutorService.create.mockRejectedValue(
-				new BadRequestException("Nome é obrigatório")
-			)
+			mockAutorService.create.mockRejectedValue(new BadRequestException("Nome é obrigatório"))
 
 			const response = await request(testHelper.httpServer)
 				.post("/autores")
@@ -150,16 +146,14 @@ describe("Autor E2E Tests", () => {
 				.send({})
 				.expect(HttpStatus.BAD_REQUEST)
 
-			// Verificar se a mensagem de erro está correta
 			expect(response.body).toHaveProperty("message", "Nome é obrigatório")
 			expect(response.body).toHaveProperty("statusCode", 400)
 			expect(mockAutorService.create).toHaveBeenCalledWith({})
 		})
 
 		it("Deve retornar BAD_REQUEST (400) se o nome for vazio", async () => {
-			// Teste adicional para nome vazio
 			mockAutorService.create.mockRejectedValue(
-				new BadRequestException("Nome não pode ser vazio")
+				new BadRequestException("Nome não pode ser vazio"),
 			)
 
 			const response = await request(testHelper.httpServer)
@@ -173,9 +167,8 @@ describe("Autor E2E Tests", () => {
 		})
 
 		it("Deve retornar BAD_REQUEST (400) se o nome for apenas espaços", async () => {
-			// Teste adicional para nome com apenas espaços
 			mockAutorService.create.mockRejectedValue(
-				new BadRequestException("Nome deve conter caracteres válidos")
+				new BadRequestException("Nome deve conter caracteres válidos"),
 			)
 
 			const response = await request(testHelper.httpServer)
@@ -193,7 +186,7 @@ describe("Autor E2E Tests", () => {
 			const autorAtualizado: AutorUpdateDto = { id: 1, nome: "Autor Atualizado" }
 			const autorAtualizadoMock = ProdutoMockFactory.createMockAutor({
 				id: 1,
-				nome: "Autor Atualizado"
+				nome: "Autor Atualizado",
 			})
 
 			mockAutorService.update.mockResolvedValue(autorAtualizadoMock)
@@ -210,7 +203,7 @@ describe("Autor E2E Tests", () => {
 
 		it("Deve retornar BAD_REQUEST (400) ao atualizar com dados inválidos", async () => {
 			mockAutorService.update.mockRejectedValue(
-				new BadRequestException("ID é obrigatório para atualização")
+				new BadRequestException("ID é obrigatório para atualização"),
 			)
 
 			await request(testHelper.httpServer)
@@ -234,9 +227,7 @@ describe("Autor E2E Tests", () => {
 		})
 
 		it("Deve retornar NOT_FOUND (404) ao tentar deletar autor inexistente", async () => {
-			mockAutorService.delete.mockRejectedValue(
-				new NotFoundException("Autor não encontrado")
-			)
+			mockAutorService.delete.mockRejectedValue(new NotFoundException("Autor não encontrado"))
 
 			await request(testHelper.httpServer)
 				.delete("/autores/999")

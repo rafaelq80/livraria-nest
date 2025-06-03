@@ -1,10 +1,10 @@
-import { HttpStatus, BadRequestException, NotFoundException } from "@nestjs/common"
+import { BadRequestException, HttpStatus, NotFoundException } from "@nestjs/common"
 import * as request from "supertest"
-import { Categoria } from "../src/categoria/entities/categoria.entity"
 import { CategoriaController } from "../src/categoria/controllers/categoria.controller"
+import { Categoria } from "../src/categoria/entities/categoria.entity"
 import { CategoriaService } from "../src/categoria/services/categoria.service"
-import { BaseTestHelper } from "./helpers/base-test.helper"
 import { ProdutoMockFactory } from "./factories/produto-mock.factory"
+import { BaseTestHelper } from "./helpers/base-test.helper"
 
 interface CategoriaCreateDto {
 	tipo: string
@@ -92,7 +92,6 @@ describe("Categoria E2E Tests", () => {
 				produtos: [],
 			})
 
-			// Verificar se as datas existem e são válidas
 			expect(response.body.createdAt).toBeDefined()
 			expect(response.body.updatedAt).toBeDefined()
 			expect(new Date(response.body.createdAt)).toBeInstanceOf(Date)
@@ -119,9 +118,9 @@ describe("Categoria E2E Tests", () => {
 	describe("POST /categorias", () => {
 		it("Deve criar uma Categoria", async () => {
 			const novaCategoria: CategoriaCreateDto = { tipo: "Nova Categoria" }
-			const categoriaCriada = ProdutoMockFactory.createMockCategoria({ 
-				id: 2, 
-				tipo: novaCategoria.tipo 
+			const categoriaCriada = ProdutoMockFactory.createMockCategoria({
+				id: 2,
+				tipo: novaCategoria.tipo,
 			})
 
 			mockCategoriaService.create.mockResolvedValue(categoriaCriada)
@@ -138,9 +137,8 @@ describe("Categoria E2E Tests", () => {
 		})
 
 		it("Deve retornar BAD_REQUEST (400) se o tipo for null", async () => {
-			// Configurar o mock para rejeitar com uma BadRequestException do NestJS
 			mockCategoriaService.create.mockRejectedValue(
-				new BadRequestException("Tipo é obrigatório")
+				new BadRequestException("Tipo é obrigatório"),
 			)
 
 			const response = await request(testHelper.httpServer)
@@ -149,16 +147,14 @@ describe("Categoria E2E Tests", () => {
 				.send({})
 				.expect(HttpStatus.BAD_REQUEST)
 
-			// Verificar se a mensagem de erro está correta
 			expect(response.body).toHaveProperty("message", "Tipo é obrigatório")
 			expect(response.body).toHaveProperty("statusCode", 400)
 			expect(mockCategoriaService.create).toHaveBeenCalledWith({})
 		})
 
 		it("Deve retornar BAD_REQUEST (400) se o tipo for vazio", async () => {
-			// Teste adicional para tipo vazio
 			mockCategoriaService.create.mockRejectedValue(
-				new BadRequestException("Tipo não pode ser vazio")
+				new BadRequestException("Tipo não pode ser vazio"),
 			)
 
 			const response = await request(testHelper.httpServer)
@@ -172,9 +168,8 @@ describe("Categoria E2E Tests", () => {
 		})
 
 		it("Deve retornar BAD_REQUEST (400) se o tipo for apenas espaços", async () => {
-			// Teste adicional para tipo com apenas espaços
 			mockCategoriaService.create.mockRejectedValue(
-				new BadRequestException("Tipo deve conter caracteres válidos")
+				new BadRequestException("Tipo deve conter caracteres válidos"),
 			)
 
 			const response = await request(testHelper.httpServer)
@@ -192,7 +187,7 @@ describe("Categoria E2E Tests", () => {
 			const categoriaAtualizada: CategoriaUpdateDto = { id: 1, tipo: "Categoria Atualizada" }
 			const categoriaAtualizadaMock = ProdutoMockFactory.createMockCategoria({
 				id: 1,
-				tipo: "Categoria Atualizada"
+				tipo: "Categoria Atualizada",
 			})
 
 			mockCategoriaService.update.mockResolvedValue(categoriaAtualizadaMock)
@@ -209,7 +204,7 @@ describe("Categoria E2E Tests", () => {
 
 		it("Deve retornar BAD_REQUEST (400) ao atualizar com dados inválidos", async () => {
 			mockCategoriaService.update.mockRejectedValue(
-				new BadRequestException("ID é obrigatório para atualização")
+				new BadRequestException("ID é obrigatório para atualização"),
 			)
 
 			await request(testHelper.httpServer)
@@ -234,7 +229,7 @@ describe("Categoria E2E Tests", () => {
 
 		it("Deve retornar NOT_FOUND (404) ao tentar deletar categoria inexistente", async () => {
 			mockCategoriaService.delete.mockRejectedValue(
-				new NotFoundException("Categoria não encontrada")
+				new NotFoundException("Categoria não encontrada"),
 			)
 
 			await request(testHelper.httpServer)

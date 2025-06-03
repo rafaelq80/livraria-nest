@@ -1,10 +1,10 @@
-import { HttpStatus, BadRequestException, NotFoundException } from "@nestjs/common"
+import { BadRequestException, HttpStatus, NotFoundException } from "@nestjs/common"
 import * as request from "supertest"
-import { Editora } from "../src/editora/entities/editora.entity"
 import { EditoraController } from "../src/editora/controllers/editora.controller"
+import { Editora } from "../src/editora/entities/editora.entity"
 import { EditoraService } from "../src/editora/services/editora.service"
-import { BaseTestHelper } from "./helpers/base-test.helper"
 import { ProdutoMockFactory } from "./factories/produto-mock.factory"
+import { BaseTestHelper } from "./helpers/base-test.helper"
 
 interface EditoraCreateDto {
 	nome: string
@@ -92,7 +92,6 @@ describe("Editora E2E Tests", () => {
 				produtos: [],
 			})
 
-			// Verificar se as datas existem e são válidas
 			expect(response.body.createdAt).toBeDefined()
 			expect(response.body.updatedAt).toBeDefined()
 			expect(new Date(response.body.createdAt)).toBeInstanceOf(Date)
@@ -119,9 +118,9 @@ describe("Editora E2E Tests", () => {
 	describe("POST /editoras", () => {
 		it("Deve criar uma Editora", async () => {
 			const novaEditora: EditoraCreateDto = { nome: "Nova Editora" }
-			const editoraCriada = ProdutoMockFactory.createMockEditora({ 
-				id: 2, 
-				nome: novaEditora.nome 
+			const editoraCriada = ProdutoMockFactory.createMockEditora({
+				id: 2,
+				nome: novaEditora.nome,
 			})
 
 			mockEditoraService.create.mockResolvedValue(editoraCriada)
@@ -138,9 +137,8 @@ describe("Editora E2E Tests", () => {
 		})
 
 		it("Deve retornar BAD_REQUEST (400) se o nome for null", async () => {
-			// Configurar o mock para rejeitar com uma BadRequestException do NestJS
 			mockEditoraService.create.mockRejectedValue(
-				new BadRequestException("Nome é obrigatório")
+				new BadRequestException("Nome é obrigatório"),
 			)
 
 			const response = await request(testHelper.httpServer)
@@ -149,16 +147,14 @@ describe("Editora E2E Tests", () => {
 				.send({})
 				.expect(HttpStatus.BAD_REQUEST)
 
-			// Verificar se a mensagem de erro está correta
 			expect(response.body).toHaveProperty("message", "Nome é obrigatório")
 			expect(response.body).toHaveProperty("statusCode", 400)
 			expect(mockEditoraService.create).toHaveBeenCalledWith({})
 		})
 
 		it("Deve retornar BAD_REQUEST (400) se o nome for vazio", async () => {
-			// Teste adicional para nome vazio
 			mockEditoraService.create.mockRejectedValue(
-				new BadRequestException("Nome não pode ser vazio")
+				new BadRequestException("Nome não pode ser vazio"),
 			)
 
 			const response = await request(testHelper.httpServer)
@@ -172,9 +168,8 @@ describe("Editora E2E Tests", () => {
 		})
 
 		it("Deve retornar BAD_REQUEST (400) se o nome for apenas espaços", async () => {
-			// Teste adicional para nome com apenas espaços
 			mockEditoraService.create.mockRejectedValue(
-				new BadRequestException("Nome deve conter caracteres válidos")
+				new BadRequestException("Nome deve conter caracteres válidos"),
 			)
 
 			const response = await request(testHelper.httpServer)
@@ -192,7 +187,7 @@ describe("Editora E2E Tests", () => {
 			const editoraAtualizada: EditoraUpdateDto = { id: 1, nome: "Editora Atualizada" }
 			const editoraAtualizadaMock = ProdutoMockFactory.createMockEditora({
 				id: 1,
-				nome: "Editora Atualizada"
+				nome: "Editora Atualizada",
 			})
 
 			mockEditoraService.update.mockResolvedValue(editoraAtualizadaMock)
@@ -209,7 +204,7 @@ describe("Editora E2E Tests", () => {
 
 		it("Deve retornar BAD_REQUEST (400) ao atualizar com dados inválidos", async () => {
 			mockEditoraService.update.mockRejectedValue(
-				new BadRequestException("ID é obrigatório para atualização")
+				new BadRequestException("ID é obrigatório para atualização"),
 			)
 
 			await request(testHelper.httpServer)
@@ -234,7 +229,7 @@ describe("Editora E2E Tests", () => {
 
 		it("Deve retornar NOT_FOUND (404) ao tentar deletar editora inexistente", async () => {
 			mockEditoraService.delete.mockRejectedValue(
-				new NotFoundException("Editora não encontrada")
+				new NotFoundException("Editora não encontrada"),
 			)
 
 			await request(testHelper.httpServer)
