@@ -1,67 +1,94 @@
-import { HttpStatus } from '@nestjs/common';
-import * as request from 'supertest';
-import { Categoria } from '../src/categoria/entities/categoria.entity';
-import { EntityMocks } from './helpers/entity-mocks.helper';
-import { RepositoryMocks } from './helpers/repository-mocks.helper';
-import { E2ETestSetup } from './helpers/test-setup.helper';
+import { HttpStatus, BadRequestException, NotFoundException } from "@nestjs/common"
+import * as request from "supertest"
+import { Categoria } from "../src/categoria/entities/categoria.entity"
+import { CategoriaController } from "../src/categoria/controllers/categoria.controller"
+import { CategoriaService } from "../src/categoria/services/categoria.service"
+import { BaseTestHelper } from "./helpers/base-test.helper"
+import { ProdutoMockFactory } from "./factories/produto-mock.factory"
 
 interface CategoriaCreateDto {
-  tipo: string;
+	tipo: string
 }
 
 interface CategoriaUpdateDto {
-  id: number;
-  tipo: string;
+	id: number
+	tipo: string
 }
 
-describe('Categoria E2E Tests', () => {
-  let testSetup: E2ETestSetup;
-  let categoriaRepositoryMock: ReturnType<typeof RepositoryMocks.createCategoriaRepositoryMock>;
+interface MockCategoriaService extends Record<string, jest.Mock> {
+	findAll: jest.Mock<Promise<Categoria[]>, unknown[]>
+	findById: jest.Mock<Promise<Categoria>, unknown[]>
+	findByTipo: jest.Mock<Promise<Categoria[]>, unknown[]>
+	create: jest.Mock<Promise<Categoria>, unknown[]>
+	update: jest.Mock<Promise<Categoria>, unknown[]>
+	delete: jest.Mock<Promise<void>, unknown[]>
+}
 
-  beforeAll(async () => {
-    testSetup = new E2ETestSetup();
-    categoriaRepositoryMock = RepositoryMocks.createCategoriaRepositoryMock();
+describe("Categoria E2E Tests", () => {
+	let testHelper: BaseTestHelper
+	let mockCategoria: Categoria
+	let mockCategoriaService: MockCategoriaService
 
-    await testSetup.setupTestModule({
-      entities: [Categoria],
-      repositoryMocks: {
-        Categoria: categoriaRepositoryMock
-      }
-    });
-  });
+	beforeAll(async () => {
+		testHelper = new BaseTestHelper()
+		mockCategoria = ProdutoMockFactory.createMockCategoria({ tipo: "Literatura Brasileira" })
 
-  afterAll(async () => {
-    await testSetup.closeApp();
-  });
+		mockCategoriaService = {
+			findAll: jest.fn<Promise<Categoria[]>, unknown[]>(),
+			findById: jest.fn<Promise<Categoria>, unknown[]>(),
+			findByTipo: jest.fn<Promise<Categoria[]>, unknown[]>(),
+			create: jest.fn<Promise<Categoria>, unknown[]>(),
+			update: jest.fn<Promise<Categoria>, unknown[]>(),
+			delete: jest.fn<Promise<void>, unknown[]>(),
+		}
 
-  afterEach(() => {
-    E2ETestSetup.clearAllMocks();
-  });
+		await testHelper.createTestModule({
+			controller: CategoriaController,
+			service: CategoriaService,
+			entity: Categoria,
+			mockServices: [
+				{
+					provide: CategoriaService,
+					useValue: mockCategoriaService,
+				},
+			],
+		})
+	})
 
-  describe('GET /categorias', () => {
-    it('Deve retornar todas as Categorias', async () => {
-      const response = await request(testSetup.getApp().getHttpServer())
-        .get('/categorias')
-        .set('Authorization', `Bearer ${testSetup.getToken()}`)
-        .expect(HttpStatus.OK);
+	afterAll(async () => {
+		await testHelper.cleanup()
+	})
 
-      expect(response.body).toHaveLength(1);
-      expect(categoriaRepositoryMock.find).toHaveBeenCalled();
-    });
-  });
+	afterEach(() => {
+		jest.clearAllMocks()
+	})
 
-  describe('GET /categorias/:id', () => {
-    it('Deve retornar uma Categoria pelo ID', async () => {
-      EntityMocks.createCategoriaMock();
-      
-      const response = await request(testSetup.getApp().getHttpServer())
-        .get('/categorias/1')
-        .set('Authorization', `Bearer ${testSetup.getToken()}`)
-        .expect(HttpStatus.OK);
+	describe("GET /categorias", () => {
+		it("Deve retornar todas as Categorias", async () => {
+			mockCategoriaService.findAll.mockResolvedValue([mockCategoria])
 
-      expect(response.body).toMatchObject({
+			const response = await request(testHelper.httpServer)
+				.get("/categorias")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.OK)
+
+			expect(response.body).toHaveLength(1)
+			expect(mockCategoriaService.findAll).toHaveBeenCalled()
+		})
+	})
+
+	describe("GET /categorias/:id", () => {
+		it("Deve retornar uma Categoria pelo ID", async () => {
+			mockCategoriaService.findById.mockResolvedValue(mockCategoria)
+
+			const response = await request(testHelper.httpServer)
+				.get("/categorias/1")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.OK)
+
+			expect(response.body).toMatchObject({
 				id: 1,
-        tipo: 'Literatura Brasileira',
+				tipo: "Literatura Brasileira",
 				produtos: [],
 			})
 
@@ -71,75 +98,149 @@ describe('Categoria E2E Tests', () => {
 			expect(new Date(response.body.createdAt)).toBeInstanceOf(Date)
 			expect(new Date(response.body.updatedAt)).toBeInstanceOf(Date)
 
-			expect(categoriaRepositoryMock.findOne).toHaveBeenCalled()
-    });
-  });
+			expect(mockCategoriaService.findById).toHaveBeenCalledWith(1)
+		})
+	})
 
-  describe('GET /categorias/tipo/:tipo', () => {
-    it('Deve retornar todas as Categorias pelo tipo', async () => {
-      const response = await request(testSetup.getApp().getHttpServer())
-        .get('/categorias/tipo/Brasileira')
-        .set('Authorization', `Bearer ${testSetup.getToken()}`)
-        .expect(HttpStatus.OK);
+	describe("GET /categorias/tipo/:tipo", () => {
+		it("Deve retornar todas as Categorias pelo tipo", async () => {
+			mockCategoriaService.findByTipo.mockResolvedValue([mockCategoria])
 
-      expect(response.body).toHaveLength(1);
-      expect(categoriaRepositoryMock.find).toHaveBeenCalled();
-    });
-  });
+			const response = await request(testHelper.httpServer)
+				.get("/categorias/tipo/Brasileira")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.OK)
 
-  describe('POST /categorias', () => {
-    it('Deve criar uma Categoria', async () => {
-      const novaCategoria: CategoriaCreateDto = { tipo: 'Nova Categoria' };
-      
-      const response = await request(testSetup.getApp().getHttpServer())
-        .post('/categorias')
-        .set('Authorization', `Bearer ${testSetup.getToken()}`)
-        .send(novaCategoria)
-        .expect(HttpStatus.CREATED);
+			expect(response.body).toHaveLength(1)
+			expect(mockCategoriaService.findByTipo).toHaveBeenCalledWith("Brasileira")
+		})
+	})
 
-      expect(response.body).toHaveProperty('id');
-      expect(response.body.tipo).toBe(novaCategoria.tipo);
-      expect(categoriaRepositoryMock.save).toHaveBeenCalled();
-    });
+	describe("POST /categorias", () => {
+		it("Deve criar uma Categoria", async () => {
+			const novaCategoria: CategoriaCreateDto = { tipo: "Nova Categoria" }
+			const categoriaCriada = ProdutoMockFactory.createMockCategoria({ 
+				id: 2, 
+				tipo: novaCategoria.tipo 
+			})
 
-    it('Deve retornar BAD_REQUEST (400) se o tipo for null', async () => {
-      await request(testSetup.getApp().getHttpServer())
-        .post('/categorias')
-        .set('Authorization', `Bearer ${testSetup.getToken()}`)
-        .send({})
-        .expect(HttpStatus.BAD_REQUEST);
-    });
-  });
+			mockCategoriaService.create.mockResolvedValue(categoriaCriada)
 
-  describe('PUT /categorias', () => {
-    it('Deve atualizar uma categoria existente', async () => {
-      const categoriaAtualizada: CategoriaUpdateDto = { id: 1, tipo: 'Categoria Atualizada' };
-      const categoriaMock = EntityMocks.createCategoriaMock();
-      
-      categoriaRepositoryMock.findOne.mockResolvedValueOnce(categoriaMock);
-      
-      const response = await request(testSetup.getApp().getHttpServer())
-        .put('/categorias')
-        .set('Authorization', `Bearer ${testSetup.getToken()}`)
-        .send(categoriaAtualizada)
-        .expect(HttpStatus.OK);
+			const response = await request(testHelper.httpServer)
+				.post("/categorias")
+				.set("Authorization", "Bearer mock-token")
+				.send(novaCategoria)
+				.expect(HttpStatus.CREATED)
 
-      expect(response.body.tipo).toBe(categoriaAtualizada.tipo);
-      expect(categoriaRepositoryMock.save).toHaveBeenCalled();
-    });
-  });
+			expect(response.body).toHaveProperty("id")
+			expect(response.body.tipo).toBe(novaCategoria.tipo)
+			expect(mockCategoriaService.create).toHaveBeenCalledWith(novaCategoria)
+		})
 
-  describe('DELETE /categorias/:id', () => {
-    it('Deve deletar uma categoria pelo ID', async () => {
-      const categoriaMock = EntityMocks.createCategoriaMock();
-      categoriaRepositoryMock.findOne.mockResolvedValueOnce(categoriaMock);
-      
-      await request(testSetup.getApp().getHttpServer())
-        .delete('/categorias/1')
-        .set('Authorization', `Bearer ${testSetup.getToken()}`)
-        .expect(HttpStatus.NO_CONTENT);
+		it("Deve retornar BAD_REQUEST (400) se o tipo for null", async () => {
+			// Configurar o mock para rejeitar com uma BadRequestException do NestJS
+			mockCategoriaService.create.mockRejectedValue(
+				new BadRequestException("Tipo é obrigatório")
+			)
 
-      expect(categoriaRepositoryMock.delete).toHaveBeenCalledWith(1);
-    });
-  });
-});
+			const response = await request(testHelper.httpServer)
+				.post("/categorias")
+				.set("Authorization", "Bearer mock-token")
+				.send({})
+				.expect(HttpStatus.BAD_REQUEST)
+
+			// Verificar se a mensagem de erro está correta
+			expect(response.body).toHaveProperty("message", "Tipo é obrigatório")
+			expect(response.body).toHaveProperty("statusCode", 400)
+			expect(mockCategoriaService.create).toHaveBeenCalledWith({})
+		})
+
+		it("Deve retornar BAD_REQUEST (400) se o tipo for vazio", async () => {
+			// Teste adicional para tipo vazio
+			mockCategoriaService.create.mockRejectedValue(
+				new BadRequestException("Tipo não pode ser vazio")
+			)
+
+			const response = await request(testHelper.httpServer)
+				.post("/categorias")
+				.set("Authorization", "Bearer mock-token")
+				.send({ tipo: "" })
+				.expect(HttpStatus.BAD_REQUEST)
+
+			expect(response.body).toHaveProperty("message", "Tipo não pode ser vazio")
+			expect(response.body).toHaveProperty("statusCode", 400)
+		})
+
+		it("Deve retornar BAD_REQUEST (400) se o tipo for apenas espaços", async () => {
+			// Teste adicional para tipo com apenas espaços
+			mockCategoriaService.create.mockRejectedValue(
+				new BadRequestException("Tipo deve conter caracteres válidos")
+			)
+
+			const response = await request(testHelper.httpServer)
+				.post("/categorias")
+				.set("Authorization", "Bearer mock-token")
+				.send({ tipo: "   " })
+				.expect(HttpStatus.BAD_REQUEST)
+
+			expect(response.body).toHaveProperty("message", "Tipo deve conter caracteres válidos")
+		})
+	})
+
+	describe("PUT /categorias", () => {
+		it("Deve atualizar uma categoria existente", async () => {
+			const categoriaAtualizada: CategoriaUpdateDto = { id: 1, tipo: "Categoria Atualizada" }
+			const categoriaAtualizadaMock = ProdutoMockFactory.createMockCategoria({
+				id: 1,
+				tipo: "Categoria Atualizada"
+			})
+
+			mockCategoriaService.update.mockResolvedValue(categoriaAtualizadaMock)
+
+			const response = await request(testHelper.httpServer)
+				.put("/categorias")
+				.set("Authorization", "Bearer mock-token")
+				.send(categoriaAtualizada)
+				.expect(HttpStatus.OK)
+
+			expect(response.body.tipo).toBe(categoriaAtualizada.tipo)
+			expect(mockCategoriaService.update).toHaveBeenCalledWith(categoriaAtualizada)
+		})
+
+		it("Deve retornar BAD_REQUEST (400) ao atualizar com dados inválidos", async () => {
+			mockCategoriaService.update.mockRejectedValue(
+				new BadRequestException("ID é obrigatório para atualização")
+			)
+
+			await request(testHelper.httpServer)
+				.put("/categorias")
+				.set("Authorization", "Bearer mock-token")
+				.send({ tipo: "Categoria Sem ID" })
+				.expect(HttpStatus.BAD_REQUEST)
+		})
+	})
+
+	describe("DELETE /categorias/:id", () => {
+		it("Deve deletar uma categoria pelo ID", async () => {
+			mockCategoriaService.delete.mockResolvedValue(undefined)
+
+			await request(testHelper.httpServer)
+				.delete("/categorias/1")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.NO_CONTENT)
+
+			expect(mockCategoriaService.delete).toHaveBeenCalledWith(1)
+		})
+
+		it("Deve retornar NOT_FOUND (404) ao tentar deletar categoria inexistente", async () => {
+			mockCategoriaService.delete.mockRejectedValue(
+				new NotFoundException("Categoria não encontrada")
+			)
+
+			await request(testHelper.httpServer)
+				.delete("/categorias/999")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.NOT_FOUND)
+		})
+	})
+})
