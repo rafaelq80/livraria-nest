@@ -1,12 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, CreateDateColumn, UpdateDateColumn } from "typeorm"
 import { Usuario } from "../../usuario/entities/usuario.entity"
 import { ApiProperty } from "@nestjs/swagger"
 
-@Entity('tb_roles')
+@Entity("tb_roles")
 export class Role {
-
 	@ApiProperty()
-	@PrimaryGeneratedColumn() 
+	@PrimaryGeneratedColumn()
 	id: number
 
 	@ApiProperty()
@@ -20,4 +19,13 @@ export class Role {
 	@ApiProperty()
 	@ManyToMany(() => Usuario, (usuario) => usuario.roles)
 	usuarios: Usuario[]
+
+	// Campos de auditoria
+	@ApiProperty({ description: "Data de criação do registro" })
+	@CreateDateColumn({ name: "created_at" })
+	createdAt: Date
+
+	@ApiProperty({ description: "Data de última atualização do registro" })
+	@UpdateDateColumn({ name: "updated_at" })
+	updatedAt: Date
 }

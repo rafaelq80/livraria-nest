@@ -4,7 +4,7 @@ import { TypeOrmModule } from "@nestjs/typeorm"
 import { AppController } from "./app.controller"
 import { AutorModule } from "./autor/autor.module"
 import { CategoriaModule } from "./categoria/categoria.module"
-import { ProdService } from "./data/services/prod.service"
+import { DevService } from "./data/services/dev.service"
 import { EditoraModule } from "./editora/editora.module"
 import { ProdutoModule } from "./produto/produto.module"
 import { RoleModule } from "./role/role.module"
@@ -18,7 +18,7 @@ import { UsuarioModule } from "./usuario/usuario.module"
 			isGlobal: true,
 		}),
 		TypeOrmModule.forRootAsync({
-			useClass: ProdService,
+			useClass: DevService,
 			imports: [ConfigModule],
 		}),
 		ProdutoModule,

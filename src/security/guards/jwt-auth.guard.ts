@@ -1,29 +1,27 @@
-﻿import { ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common"
-import { AuthGuard } from "@nestjs/passport"
-import { VerifyErrors } from "jsonwebtoken"
+﻿import { ExecutionContext, Injectable } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard("jwt") {
-	canActivate(context: ExecutionContext) {
-		// Adiciona lógica customizada antes da validação padrão
-		return super.canActivate(context)
-	}
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  canActivate(context: ExecutionContext) {
+    const request = context.switchToHttp().getRequest();
+    
+    const publicRoutes = [
+      '/auth/google',
+      '/auth/google/callback',
+      '/usuarios/logar',
+      '/usuarios/recuperarsenha',
+      '/usuarios/atualizarsenha'
+    ];
+    
+    const isPublic = publicRoutes.some(route => 
+      request.url.startsWith(route)
+    );
+    
+    if (isPublic) {
+      return true;
+    }
 
-	handleRequest(error: VerifyErrors, usuario: never, info?: Error & { name?: string; message?: string }) {
-		if (info?.name === "JsonWebTokenError") {
-			throw new UnauthorizedException("Token inválido. Por favor, forneça um token válido.")
-		}
-
-		if (info?.message === "No auth token") {
-			throw new UnauthorizedException(
-				"Token de autenticação não enviado. Por favor, envie o token no cabeçalho.",
-			)
-		}
-
-		if (error || !usuario) {
-			throw error || new UnauthorizedException("Acesso não autorizado.")
-		}
-
-		return usuario
-	}
+    return super.canActivate(context);
+  }
 }

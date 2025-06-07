@@ -43,17 +43,25 @@ export class RoleService {
 		return new Map(roles.map((autor) => [autor.id, autor]))
 	}
 
+	async findByNome(nome: string): Promise<Role | undefined> {
+		return await this.roleRepository.findOne({
+			where: { nome },
+			relations: {
+				usuarios: true,
+			},
+		})
+	}
+
 	async create(role: Role): Promise<Role> {
 		if (!role) throw new BadRequestException("Dados do role inválidos")
 		return this.roleRepository.save(role)
 	}
 
 	async update(role: Role): Promise<Role> {
-		if (!role?.id) throw new BadRequestException("Dados do role inválidos");
-		await this.findById(role.id);
-		return this.roleRepository.save(role);
-	  }
-	  
+		if (!role?.id) throw new BadRequestException("Dados do role inválidos")
+		await this.findById(role.id)
+		return this.roleRepository.save(role)
+	}
 
 	async delete(id: number): Promise<void> {
 		await this.findById(id)
