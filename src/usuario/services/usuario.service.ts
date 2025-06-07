@@ -1,4 +1,4 @@
-﻿import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common"
+﻿import { HttpException, HttpStatus, Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { QueryRunner, Repository } from "typeorm"
 import { ImageKitService } from "../../imagekit/services/imagekit.service"
@@ -6,6 +6,7 @@ import { RoleService } from "../../role/services/role.service"
 import { Bcrypt } from "../../security/bcrypt/bcrypt"
 import { SendmailService } from "../../sendmail/services/sendmail.service"
 import { Usuario } from "../entities/usuario.entity"
+import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class UsuarioService {
@@ -20,12 +21,17 @@ export class UsuarioService {
 		private readonly imagekitService: ImageKitService,
 	) {}
 
-	async findByUsuario(usuario: string): Promise<Usuario | undefined> {
-		return await this.usuarioRepository.findOne({
+	async findByUsuario(usuario: string): Promise<Usuario | null> {
+		return this.usuarioRepository.findOne({
 			where: { usuario },
-			relations: {
-				roles: true,
-			},
+			relations: ["roles"],
+		})
+	}
+
+	async findByGoogleId(googleId: string): Promise<Usuario | null> {
+		return this.usuarioRepository.findOne({
+			where: { googleId },
+			relations: ["roles"],
 		})
 	}
 
@@ -38,63 +44,59 @@ export class UsuarioService {
 	}
 
 	async findById(id: number): Promise<Usuario> {
-		if (id <= 0) throw new HttpException("Id inválido!", HttpStatus.BAD_REQUEST)
+		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 
 		const usuario = await this.usuarioRepository.findOne({
-			where: {
-				id,
-			},
-			relations: {
-				roles: true,
-			},
+			where: { id },
+			relations: ["roles"],
 		})
 
-		if (!usuario) throw new HttpException("Usuário não encontrado!", HttpStatus.NOT_FOUND)
+		if (!usuario) throw new NotFoundException(ErrorMessages.USER.NOT_FOUND)
 
 		return usuario
 	}
 
 	async create(usuario: Usuario, fotoFile: Express.Multer.File): Promise<Usuario> {
-    await this.verificarUsuarioDuplicado(usuario.usuario)
+		await this.verificarUsuarioDuplicado(usuario.usuario)
 
-    usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
+		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
 
-     // Buscar roles usando findManyByIds
-    if (usuario.roles && usuario.roles.length > 0) {
-        const roleIds = usuario.roles.map(r => r.id)
-        const rolesMap = await this.roleService.findManyByIds(roleIds)
-        usuario.roles = roleIds.map(id => rolesMap.get(id))
-    }
-	
-    const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
+		// Buscar roles usando findManyByIds
+		if (usuario.roles && usuario.roles.length > 0) {
+			const roleIds = usuario.roles.map(r => r.id)
+			const rolesMap = await this.roleService.findManyByIds(roleIds)
+			usuario.roles = roleIds.map(id => rolesMap.get(id))
+		}
 
-    try {
-        await queryRunner.connect()
-        await queryRunner.startTransaction()
+		const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
 
-        const saveUsuario = await queryRunner.manager.save(Usuario, usuario)
+		try {
+			await queryRunner.connect()
+			await queryRunner.startTransaction()
 
-        const fotoUrl = await this.processarImagem(saveUsuario, fotoFile)
-        if (fotoUrl) {
-            saveUsuario.foto = fotoUrl
-            await queryRunner.manager.save(Usuario, saveUsuario)
-        }
+			const saveUsuario = await queryRunner.manager.save(Usuario, usuario)
 
-        await queryRunner.commitTransaction()
+			const fotoUrl = await this.processarImagem(saveUsuario, fotoFile)
+			if (fotoUrl) {
+				saveUsuario.foto = fotoUrl
+				await queryRunner.manager.save(Usuario, saveUsuario)
+			}
 
-        await this.sendmailService
-            .sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
-            .catch((error) => {
-                this.logger.warn(`Erro ao enviar email: ${error.message}`, error.stack)
-            })
+			await queryRunner.commitTransaction()
 
-        return saveUsuario
-    } catch (error) {
-        await this.tratarErro(queryRunner, error)
-    } finally {
-        await queryRunner.release()
-    }
-}
+			await this.sendmailService
+				.sendmailConfirmacao(saveUsuario.nome, saveUsuario.usuario)
+				.catch((error) => {
+					this.logger.warn(`Erro ao enviar email: ${error.message}`, error.stack)
+				})
+
+			return saveUsuario
+		} catch (error) {
+			await this.tratarErro(queryRunner, error)
+		} finally {
+			await queryRunner.release()
+		}
+	}
 
 	async update(usuario: Usuario, fotoFile?: Express.Multer.File): Promise<Usuario> {
 		if (!usuario?.id) {
@@ -136,19 +138,27 @@ export class UsuarioService {
 		return await this.usuarioRepository.save(buscaUsuario)
 	}
 
+	async delete(id: number): Promise<void> {
+		const result = await this.usuarioRepository.delete(id)
+
+		if (result.affected === 0) {
+			throw new NotFoundException(ErrorMessages.USER.NOT_FOUND)
+		}
+	}
+
 	// Métodos Auxiliares
 
 	private async verificarUsuarioDuplicado(usuario: string): Promise<void> {
 		const existeUsuario = await this.findByUsuario(usuario)
 		if (existeUsuario) {
-			throw new HttpException("O Usuário já existe!", HttpStatus.BAD_REQUEST)
+			throw new BadRequestException(ErrorMessages.USER.ALREADY_EXISTS)
 		}
 	}
 
 	private async validarUsuarioExistente(usuario: Usuario, usuarioAtual: Usuario): Promise<void> {
 		const buscaUsuario = await this.findByUsuario(usuario.usuario)
 		if (buscaUsuario && buscaUsuario.id !== usuarioAtual.id) {
-			throw new HttpException("Usuário (e-mail) já Cadastrado!", HttpStatus.BAD_REQUEST)
+			throw new BadRequestException(ErrorMessages.USER.ALREADY_EXISTS)
 		}
 	}
 

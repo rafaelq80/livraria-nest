@@ -1,9 +1,10 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable } from "@nestjs/common"
+import { BadRequestException, HttpException, Injectable, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { In, Repository } from "typeorm"
-import { Role } from "../entities/role.entity"
-import { Usuario } from "../../usuario/entities/usuario.entity"
+import { ErrorMessages } from "../../common/constants/error-messages"
 import { HasId } from "../../types/hasid"
+import { Usuario } from "../../usuario/entities/usuario.entity"
+import { Role } from "../entities/role.entity"
 
 @Injectable()
 export class RoleService {
@@ -17,14 +18,14 @@ export class RoleService {
 	}
 
 	async findById(id: number): Promise<Role> {
-		if (id <= 0) throw new BadRequestException("Id inválido!")
+		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 
 		const role = await this.roleRepository.findOne({
 			where: { id },
 			relations: { usuarios: true },
 		})
 
-		if (!role) throw new HttpException("Role não encontrado!", HttpStatus.NOT_FOUND)
+		if (!role) throw new NotFoundException(ErrorMessages.ROLE.NOT_FOUND)
 
 		return role
 	}
@@ -37,7 +38,7 @@ export class RoleService {
 		if (roles.length !== ids.length) {
 			const foundIds = roles.map((a) => a.id)
 			const missingIds = ids.filter((id) => !foundIds.includes(id))
-			throw new BadRequestException(`Roles não encontrados: ${missingIds.join(", ")}`)
+			throw new BadRequestException(`${ErrorMessages.ROLE.NOT_FOUND}: ${missingIds.join(", ")}`)
 		}
 
 		return new Map(roles.map((autor) => [autor.id, autor]))
@@ -94,7 +95,7 @@ export class RoleService {
 			return { ...usuario, roles }
 		} catch (error) {
 			if (error instanceof HttpException) throw error
-			throw new BadRequestException(`Formato inválido para o campo roles: ${error.message}`)
+			throw new BadRequestException(ErrorMessages.ROLE.INVALID_DATA)
 		}
 	}
 

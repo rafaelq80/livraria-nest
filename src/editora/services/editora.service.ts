@@ -1,86 +1,73 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DeleteResult, ILike, Repository } from 'typeorm';
-import { Editora } from '../entities/editora.entity';
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
+import { InjectRepository } from "@nestjs/typeorm"
+import { DeleteResult, ILike, Repository } from "typeorm"
+import { ErrorMessages } from "../../common/constants/error-messages"
+import { Editora } from "../entities/editora.entity"
 
 @Injectable()
 export class EditoraService {
-  constructor(
-    @InjectRepository(Editora)
-    private readonly editoraRepository: Repository<Editora>,
-  ) {}
+	constructor(
+		@InjectRepository(Editora)
+		private readonly editoraRepository: Repository<Editora>,
+	) {}
 
-  async findAll(): Promise<Editora[]> {
-    return await this.editoraRepository.find({
-      relations: {
-        produtos: true,
-      },
-      order: {
-        nome: 'ASC',
-      },
-    });
-  }
+	async findAll(): Promise<Editora[]> {
+		return await this.editoraRepository.find({
+			relations: {
+				produtos: true,
+			},
+			order: {
+				nome: 'ASC',
+			},
+		})
+	}
 
-  async findById(id: number): Promise<Editora> {
+	async findById(id: number): Promise<Editora> {
+		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 
-    if (id <= 0)
-        throw new HttpException('Id inválido!', HttpStatus.BAD_REQUEST);
+		const editora = await this.editoraRepository.findOne({
+			where: { id },
+			relations: { produtos: true },
+		})
 
-    const editora = await this.editoraRepository.findOne({
-      where: {
-        id,
-      },
-      relations: {
-        produtos: true,
-      },
-    });
+		if (!editora) throw new NotFoundException(ErrorMessages.EDITORA.NOT_FOUND)
 
-    if (!editora)
-      throw new HttpException('Editora não encontrado!', HttpStatus.NOT_FOUND);
+		return editora
+	}
 
-    return editora;
-  }
+	async findByNome(nome: string): Promise<Editora[]> {
+		return await this.editoraRepository.find({
+			where: {
+				nome: ILike(`%${nome.trim()}%`),
+			},
+			relations: {
+				produtos: true,
+			},
+			order: {
+				nome: 'ASC',
+			},
+		})
+	}
 
-  async findByNome(nome: string): Promise<Editora[]> {
-    return await this.editoraRepository.find({
-      where: {
-        nome: ILike(`%${nome.trim()}%`),
-      },
-      relations: {
-        produtos: true,
-      },
-      order: {
-        nome: 'ASC',
-      },
-    });
-  }
+	async create(editora: Editora): Promise<Editora> {
+		if (!editora) throw new BadRequestException(ErrorMessages.EDITORA.INVALID_DATA)
 
-  async create(editora: Editora): Promise<Editora> {
+		return await this.editoraRepository.save(editora)
+	}
 
-    if (!editora)
-        throw new HttpException('Dados do editora inválidos', HttpStatus.BAD_REQUEST);
+	async update(editora: Editora): Promise<Editora> {
+		if (!editora?.id) throw new BadRequestException(ErrorMessages.EDITORA.INVALID_DATA)
 
-    return await this.editoraRepository.save(editora);
-  }
+		await this.findById(editora.id)
 
-  async update(editora: Editora): Promise<Editora> {
-    
-    if (!editora?.id)
-      throw new HttpException('Editora inválido!', HttpStatus.BAD_REQUEST);
+		return await this.editoraRepository.save(editora)
+	}
 
-    await this.findById(editora.id);
+	async delete(id: number): Promise<DeleteResult> {
+		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 
-    return await this.editoraRepository.save(editora);
-    
-  }
+		await this.findById(id)
 
-  async delete(id: number): Promise<DeleteResult> {
-
-    if (id <= 0)
-        throw new HttpException('Id inválido!', HttpStatus.BAD_REQUEST);
-
-    await this.findById(id);
-
-    return await this.editoraRepository.delete(id);
-  }
+		return await this.editoraRepository.delete(id)
+	}
 }

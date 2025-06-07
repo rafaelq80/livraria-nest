@@ -5,6 +5,7 @@ import { UsuarioService } from "../../usuario/services/usuario.service"
 import { RecuperarSenhaDto } from "../dto/recuperarsenha.dto"
 import { SendmailDto } from "../dto/sendmail.dto"
 import { SecurityService } from "./security.service"
+import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class RecuperarSenhaService {
@@ -46,7 +47,7 @@ export class RecuperarSenhaService {
 			const buscaUsuario = await this.usuarioService.findByUsuario(decoded.sub)
 
 			if (!buscaUsuario) {
-				throw new NotFoundException("Usuário não encontrado")
+				throw new NotFoundException(ErrorMessages.USER.NOT_FOUND)
 			}
 
 			await this.usuarioService.updateSenha(decoded.sub, recuperarSenhaDto.senha)
@@ -54,9 +55,9 @@ export class RecuperarSenhaService {
 			return { message: "Senha alterada com sucesso" }
 		} catch (error) {
 			if (error.name === "TokenExpiredError") {
-				throw new UnauthorizedException("O link de recuperação expirou")
+				throw new UnauthorizedException(ErrorMessages.EMAIL.RECOVERY_LINK_EXPIRED)
 			}
-			throw new UnauthorizedException("Link de recuperação inválido")
+			throw new UnauthorizedException(ErrorMessages.EMAIL.RECOVERY_LINK_INVALID)
 		}
 	}
 }

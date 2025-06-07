@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable } from "@nestjs/common"
+import { BadRequestException, HttpException, HttpStatus, Injectable, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { DeleteResult, ILike, Repository } from "typeorm"
 import { ImageKitService } from "../../imagekit/services/imagekit.service"
@@ -7,6 +7,7 @@ import { CategoriaService } from "./../../categoria/services/categoria.service"
 import { EditoraService } from "./../../editora/services/editora.service"
 import { Categoria } from "../../categoria/entities/categoria.entity"
 import { Editora } from "../../editora/entities/editora.entity"
+import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class ProdutoService {
@@ -33,7 +34,7 @@ export class ProdutoService {
 	}
 
 	async findById(id: number): Promise<Produto> {
-		if (id <= 0) throw new HttpException("Id inválido!", HttpStatus.BAD_REQUEST)
+		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 
 		const produto = await this.produtoRepository.findOne({
 			where: { id },
@@ -44,7 +45,7 @@ export class ProdutoService {
 			},
 		})
 
-		if (!produto) throw new HttpException("Produto não encontrado!", HttpStatus.NOT_FOUND)
+		if (!produto) throw new NotFoundException(ErrorMessages.PRODUTO.NOT_FOUND)
 
 		return produto
 	}

@@ -1,7 +1,8 @@
-import { HttpException, HttpStatus, Injectable } from "@nestjs/common"
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { ILike, Repository } from "typeorm"
 import { Categoria } from "../entities/categoria.entity"
+import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class CategoriaService {
@@ -22,18 +23,14 @@ export class CategoriaService {
 	}
 
 	async findById(id: number): Promise<Categoria> {
-		if (id <= 0) throw new HttpException("Id inválido!", HttpStatus.BAD_REQUEST)
+		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 
 		const categoria = await this.categoriaRepository.findOne({
-			where: {
-				id,
-			},
-			relations: {
-				produtos: true,
-			},
+			where: { id },
+			relations: { produtos: true },
 		})
 
-		if (!categoria) throw new HttpException("Categoria não encontrada!", HttpStatus.NOT_FOUND)
+		if (!categoria) throw new NotFoundException(ErrorMessages.CATEGORIA.NOT_FOUND)
 
 		return categoria
 	}
@@ -53,14 +50,13 @@ export class CategoriaService {
 	}
 
 	async create(categoria: Categoria): Promise<Categoria> {
-		if (!categoria) throw new HttpException("Dados do autor inválidos", HttpStatus.BAD_REQUEST)
+		if (!categoria) throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
 
 		return await this.categoriaRepository.save(categoria)
 	}
 
 	async update(categoria: Categoria): Promise<Categoria> {
-		if (!categoria?.id)
-			throw new HttpException("Dados da categoria inválidos", HttpStatus.BAD_REQUEST)
+		if (!categoria?.id) throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
 
 		await this.findById(categoria.id)
 
@@ -68,12 +64,9 @@ export class CategoriaService {
 	}
 
 	async delete(id: number): Promise<void> {
-
-		if (id <= 0) 
-      throw new HttpException("Id inválido!", HttpStatus.BAD_REQUEST)
+		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 
 		await this.findById(id)
 		await this.categoriaRepository.delete(id)
-    
 	}
 }

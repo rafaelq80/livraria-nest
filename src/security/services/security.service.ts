@@ -1,10 +1,11 @@
-﻿import { HttpException, HttpStatus, Injectable } from "@nestjs/common"
+﻿import { HttpException, HttpStatus, Injectable, UnauthorizedException } from "@nestjs/common"
 import { JwtService } from "@nestjs/jwt"
+import { ErrorMessages } from "../../common/constants/error-messages"
+import { Usuario } from "../../usuario/entities/usuario.entity"
 import { UsuarioService } from "../../usuario/services/usuario.service"
 import { Bcrypt } from "../bcrypt/bcrypt"
-import { UsuarioLoginDto } from "../dto/usuariologin.dto"
-import { UsuarioAutenticado } from "../interfaces/usuarioautenticado.interface"
 import { JwtPayload } from "../interfaces/jwtpayload.interface"
+import { UsuarioAutenticado } from "../interfaces/usuarioautenticado.interface"
 
 @Injectable()
 export class SecurityService {
@@ -14,73 +15,57 @@ export class SecurityService {
 		private readonly bcrypt: Bcrypt,
 	) {}
 
-	async validateUser(usuario: string, senhaDigitada: string): Promise<Omit<UsuarioAutenticado, "token">> {
-		this.validarCredenciais(usuario, senhaDigitada)
-		
-		const [usuarioNormalizado, senhaNormalizada] = this.sanitizarCredenciais(usuario, senhaDigitada)
-
-		const buscaUsuario = await this.usuarioService.findByUsuario(usuarioNormalizado)
-		
-		if (!buscaUsuario) 
-			throw new HttpException("Usuário não encontrado!", HttpStatus.NOT_FOUND)
-
-		const validarSenha = await this.bcrypt.compararSenhas(senhaNormalizada, buscaUsuario.senha)
-		
-		if (!validarSenha)
-			throw new HttpException("Senha incorreta!", HttpStatus.UNAUTHORIZED)
-
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const { senha, ...dadosUsuario } = buscaUsuario
-
-		return dadosUsuario
-	}
-
-	async login(usuarioLogin: UsuarioLoginDto): Promise<UsuarioAutenticado> {
-		const usuarioNormalizado = usuarioLogin.usuario.trim().toLowerCase()
-
-		const buscaUsuario = await this.usuarioService.findByUsuario(usuarioNormalizado)
+	async validateUser(usuario: string, senha: string): Promise<Omit<Usuario, 'senha'>> {
+		const buscaUsuario = await this.usuarioService.findByUsuario(usuario)
 
 		if (!buscaUsuario) {
-			throw new HttpException("Usuário inválido!", HttpStatus.NOT_FOUND)
+			throw new UnauthorizedException(ErrorMessages.AUTH.USER_NOT_FOUND)
 		}
 
-		const token = this.gerarToken(usuarioNormalizado)
+		const match = await this.bcrypt.compararSenhas(senha, buscaUsuario.senha)
+
+		if (!match) {
+			throw new UnauthorizedException(ErrorMessages.AUTH.INVALID_PASSWORD)
+		}
+
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		const { senha: _, ...result } = buscaUsuario
+		return result
+	}
+
+	async login(usuario: Usuario): Promise<UsuarioAutenticado> {
+		const payload = {
+			sub: usuario.id,
+			usuario: usuario.usuario,
+			nome: usuario.nome,
+			roles: usuario.roles.map((role) => role.nome),
+		}
+
+		const token = this.jwtService.sign(payload)
 
 		return {
-			id: buscaUsuario.id,
-			nome: buscaUsuario.nome,
-			usuario: usuarioLogin.usuario,
-			foto: buscaUsuario.foto,
-			roles: buscaUsuario.roles,
+			id: usuario.id,
+			nome: usuario.nome,
+			usuario: usuario.usuario,
+			foto: usuario.foto,
+			roles: usuario.roles,
 			token,
 		}
 	}
 
-	// Método para login com Google usando roles simples
-	async loginGoogle(usuarioGoogle: {
-		id: number
-		nome: string
-		usuario: string
-		email: string
-		foto?: string
-		roles: Array<{ nome: string }>
-		googleId: string
-	}): Promise<UsuarioAutenticado> {
-		const token = this.gerarToken(usuarioGoogle.usuario)
+	async loginGoogle(id: string): Promise<UsuarioAutenticado> {
+		const usuario = await this.usuarioService.findByGoogleId(id)
 
-		return {
-			id: usuarioGoogle.id,
-			nome: usuarioGoogle.nome,
-			usuario: usuarioGoogle.usuario,
-			foto: usuarioGoogle.foto,
-			roles: usuarioGoogle.roles,
-			token,
+		if (!usuario) {
+			throw new UnauthorizedException(ErrorMessages.AUTH.USER_NOT_FOUND)
 		}
+
+		return this.login(usuario)
 	}
 
 	private validarCredenciais(usuario: string, senha: string): void {
 		if (!usuario?.trim() || !senha?.trim()) {
-			throw new HttpException("Usuário e Senha são Obrigatórios!", HttpStatus.BAD_REQUEST)
+			throw new HttpException(ErrorMessages.AUTH.CREDENTIALS_REQUIRED, HttpStatus.BAD_REQUEST)
 		}
 	}
 

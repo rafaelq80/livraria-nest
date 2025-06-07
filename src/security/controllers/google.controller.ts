@@ -2,6 +2,7 @@ import { Controller, Get, UseGuards, Req, BadRequestException } from "@nestjs/co
 import { GoogleAuthGuard } from "../guards/google-auth.guard"
 import { UsuarioAutenticado } from "../interfaces/usuarioautenticado.interface"
 import { SecurityService } from "../services/security.service"
+import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Controller("/auth")
 export class GoogleController {
@@ -23,11 +24,10 @@ export class GoogleController {
 		googleId: string
 	}}): Promise<UsuarioAutenticado> {
 		try {
-			const usuarioAutenticado = await this.securityService.loginGoogle(req.user)
-			return usuarioAutenticado
+			return await this.securityService.loginGoogle(req.user.googleId)
 		} catch (error) {
 			console.error("Erro na autenticação:", error instanceof Error ? error.message : error)
-			throw new BadRequestException("Erro na autenticação com Google")
+			throw new BadRequestException(ErrorMessages.AUTH.GOOGLE_AUTH_FAILED)
 		}
 	}
 }

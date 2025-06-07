@@ -1,9 +1,10 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable } from "@nestjs/common"
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { DeleteResult, ILike, In, Repository } from "typeorm"
-import { Autor } from "../entities/autor.entity"
+import { ErrorMessages } from "../../common/constants/error-messages"
 import { Produto } from "../../produto/entities/produto.entity"
 import { HasId } from "../../types/hasid"
+import { Autor } from "../entities/autor.entity"
 
 @Injectable()
 export class AutorService {
@@ -24,14 +25,14 @@ export class AutorService {
 	}
 
 	async findById(id: number): Promise<Autor> {
-		if (id <= 0) throw new HttpException("Id inválido!", HttpStatus.BAD_REQUEST)
+		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 
 		const autor = await this.autorRepository.findOne({
 			where: { id },
 			relations: { produtos: true },
 		})
 
-		if (!autor) throw new HttpException("Autor não encontrado!", HttpStatus.NOT_FOUND)
+		if (!autor) throw new NotFoundException(ErrorMessages.AUTHOR.NOT_FOUND)
 
 		return autor
 	}
@@ -44,7 +45,7 @@ export class AutorService {
 		if (autores.length !== ids.length) {
 			const foundIds = autores.map((a) => a.id)
 			const missingIds = ids.filter((id) => !foundIds.includes(id))
-			throw new BadRequestException(`Autores não encontrados: ${missingIds.join(", ")}`)
+			throw new BadRequestException(`${ErrorMessages.AUTHOR.NOT_FOUND}: ${missingIds.join(", ")}`)
 		}
 
 		return new Map(autores.map((autor) => [autor.id, autor]))
@@ -61,13 +62,13 @@ export class AutorService {
 	}
 
 	async create(autor: Autor): Promise<Autor> {
-		if (!autor) throw new HttpException("Dados do autor inválidos", HttpStatus.BAD_REQUEST)
+		if (!autor) throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
 
 		return await this.autorRepository.save(autor)
 	}
 
 	async update(autor: Autor): Promise<Autor> {
-		if (!autor?.id) throw new HttpException("Autor inválido!", HttpStatus.BAD_REQUEST)
+		if (!autor?.id) throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
 
 		await this.findById(autor.id)
 
@@ -75,7 +76,7 @@ export class AutorService {
 	}
 
 	async delete(id: number): Promise<DeleteResult> {
-		if (id <= 0) throw new HttpException("Id inválido!", HttpStatus.BAD_REQUEST)
+		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 
 		await this.findById(id)
 

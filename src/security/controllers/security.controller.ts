@@ -16,6 +16,8 @@ import { LocalAuthGuard } from "../guards/local-auth.guard"
 import { UsuarioAutenticado } from "../interfaces/usuarioautenticado.interface"
 import { RecuperarSenhaService } from "../services/recuperarsenha.service"
 import { SecurityService } from "../services/security.service"
+import { ErrorMessages } from "../../common/constants/error-messages"
+import { Usuario } from "../../usuario/entities/usuario.entity"
 
 @ApiTags("Usuário")
 @Controller("/usuarios")
@@ -28,8 +30,12 @@ export class SecurityController {
 	@UseGuards(LocalAuthGuard)
 	@HttpCode(HttpStatus.OK)
 	@Post("/logar")
-	login(@Body() usuarioLoginDto: UsuarioLoginDto): Promise<UsuarioAutenticado> {
-		return this.securityService.login(usuarioLoginDto)
+	async login(@Body() usuarioLoginDto: UsuarioLoginDto): Promise<UsuarioAutenticado> {
+		const usuario = await this.securityService.validateUser(
+			usuarioLoginDto.usuario,
+			usuarioLoginDto.senha,
+		)
+		return this.securityService.login(usuario as Usuario)
 	}
 
 	@Post("/recuperarsenha")
@@ -52,7 +58,7 @@ export class SecurityController {
 	@Patch("/atualizarsenha")
 	async resetPassword(@Body() recuperarSenhaDto: RecuperarSenhaDto) {
 		if (recuperarSenhaDto.senha !== recuperarSenhaDto.confirmarSenha) {
-			throw new BadRequestException("As senhas não coincidem")
+			throw new BadRequestException(ErrorMessages.EMAIL.PASSWORDS_DONT_MATCH)
 		}
 
 		return this.recuperarSenhaService.atualizarSenha(recuperarSenhaDto)

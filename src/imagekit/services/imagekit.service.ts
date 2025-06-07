@@ -5,6 +5,7 @@ import { lastValueFrom } from "rxjs"
 import { createCanvas, loadImage } from "canvas"
 import { ImagekitDto } from "../dto/imagekit.dto"
 import { ImagekitResponse } from "../types/imagekitresponse"
+import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class ImageKitService {
@@ -144,7 +145,7 @@ export class ImageKitService {
 
 	private async uploadImage(image: Express.Multer.File, folder: string): Promise<string> {
 		if (!image) {
-			throw new HttpException("Arquivo de imagem não fornecido", HttpStatus.BAD_REQUEST)
+			throw new HttpException(ErrorMessages.IMAGE.NOT_PROVIDED, HttpStatus.BAD_REQUEST)
 		}
 
 		this.validateImage(image)
@@ -155,19 +156,19 @@ export class ImageKitService {
 
 	private validateImage(image: Express.Multer.File): void {
 		if (!image) {
-			throw new HttpException("Arquivo não fornecido", HttpStatus.BAD_REQUEST)
+			throw new HttpException(ErrorMessages.IMAGE.NOT_PROVIDED, HttpStatus.BAD_REQUEST)
 		}
 
 		if (!image.mimetype || !this.ALLOWED_TYPES.includes(image.mimetype)) {
 			throw new HttpException(
-				`Formato de arquivo inválido. Apenas ${this.ALLOWED_TYPES.join(", ")} são permitidos.`,
+				`${ErrorMessages.IMAGE.INVALID_FORMAT} Formatos permitidos: ${this.ALLOWED_TYPES.join(", ")}`,
 				HttpStatus.BAD_REQUEST,
 			)
 		}
 
 		if (!image.size || image.size > this.MAX_FILE_SIZE) {
 			throw new HttpException(
-				"O arquivo excede o tamanho máximo permitido de 5MB.",
+				ErrorMessages.IMAGE.SIZE_EXCEEDED,
 				HttpStatus.BAD_REQUEST,
 			)
 		}
@@ -338,7 +339,7 @@ export class ImageKitService {
 
 	private async downloadImage(url: string): Promise<Buffer> {
 		if (!url || typeof url !== 'string') {
-			throw new HttpException("URL da imagem inválida", HttpStatus.BAD_REQUEST)
+			throw new HttpException(ErrorMessages.IMAGE.INVALID_URL, HttpStatus.BAD_REQUEST)
 		}
 
 		try {
@@ -358,7 +359,7 @@ export class ImageKitService {
 			const errorMessage = error instanceof Error ? error.message : String(error)
 			console.error("Erro ao baixar imagem:", errorMessage)
 			throw new HttpException(
-				`Erro ao baixar a imagem: ${errorMessage}`,
+				`${ErrorMessages.IMAGE.DOWNLOAD_ERROR} ${errorMessage}`,
 				HttpStatus.BAD_REQUEST
 			)
 		}

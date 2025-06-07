@@ -9,6 +9,7 @@ import { Role } from "../../role/entities/role.entity"
 import { Bcrypt } from "../bcrypt/bcrypt"
 import { OAuth2Client } from "google-auth-library"
 import { GoogleProfile } from "../interfaces/google.interface"
+import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
@@ -44,7 +45,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
 			const { id, displayName, emails, photos } = profile as GoogleProfile
 
 			if (!emails || emails.length === 0) {
-				throw new UnauthorizedException("Email do Google não encontrado")
+				throw new UnauthorizedException(ErrorMessages.AUTH.GOOGLE_EMAIL_NOT_FOUND)
 			}
 
 			const email = emails[0].value
@@ -87,17 +88,15 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
 			}
 
 			if (!usuario.roles || usuario.roles.length === 0) {
-				throw new UnauthorizedException("Usuário sem roles definidas")
+				throw new UnauthorizedException(ErrorMessages.AUTH.NO_ROLES)
 			}
 
-			// CORRIGIDO: Garantir que o ID seja numérico e roles sejam objetos
 			const usuarioValidado = {
-				id: Number(usuario.id), // Garantir que seja número
+				id: Number(usuario.id),
 				nome: usuario.nome,
 				usuario: usuario.usuario,
 				email: usuario.usuario,
 				foto: usuario.foto,
-				// Corrigido: manter como array de objetos para consistência
 				roles: usuario.roles.map((role) => ({ nome: role.nome })),
 				googleId: id,
 			}
@@ -137,17 +136,17 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
 			)
 
 			if (!response.ok) {
-				throw new UnauthorizedException("Token do Google inválido")
+				throw new UnauthorizedException(ErrorMessages.AUTH.GOOGLE_TOKEN_INVALID)
 			}
 
 			const googleUserInfo = await response.json()
 
 			if (!googleUserInfo.email || googleUserInfo.email !== expectedEmail) {
-				throw new UnauthorizedException("Email do token não corresponde ao perfil")
+				throw new UnauthorizedException(ErrorMessages.AUTH.GOOGLE_EMAIL_MISMATCH)
 			}
 
 			if (!googleUserInfo.verified_email) {
-				throw new UnauthorizedException("Email do Google não verificado")
+				throw new UnauthorizedException(ErrorMessages.AUTH.GOOGLE_EMAIL_NOT_VERIFIED)
 			}
 
 		} catch (error) {
@@ -155,7 +154,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
 				throw error
 			}
 			console.error('Erro na validação do token Google:', error)
-			throw new UnauthorizedException("Falha na validação do token Google")
+			throw new UnauthorizedException(ErrorMessages.AUTH.GOOGLE_TOKEN_INVALID)
 		}
 	}
 }
