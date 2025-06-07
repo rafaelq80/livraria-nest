@@ -1,4 +1,4 @@
-﻿import { HttpException, HttpStatus, Injectable, UnauthorizedException } from "@nestjs/common"
+﻿import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common"
 import { JwtService } from "@nestjs/jwt"
 import { ErrorMessages } from "../../common/constants/error-messages"
 import { Usuario } from "../../usuario/entities/usuario.entity"
@@ -16,32 +16,28 @@ export class SecurityService {
 	) {}
 
 	async validateUser(usuario: string, senha: string): Promise<Omit<Usuario, 'senha'>> {
-		const buscaUsuario = await this.usuarioService.findByUsuario(usuario)
+		this.validarCredenciais(usuario, senha)
+		const [usuarioSanitizado, senhaSanitizada] = this.sanitizarCredenciais(usuario, senha)
+
+		const buscaUsuario = await this.usuarioService.findByUsuario(usuarioSanitizado)
 
 		if (!buscaUsuario) {
 			throw new UnauthorizedException(ErrorMessages.AUTH.USER_NOT_FOUND)
 		}
 
-		const match = await this.bcrypt.compararSenhas(senha, buscaUsuario.senha)
+		const match = await this.bcrypt.compararSenhas(senhaSanitizada, buscaUsuario.senha)
 
 		if (!match) {
 			throw new UnauthorizedException(ErrorMessages.AUTH.INVALID_PASSWORD)
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		const { senha: _, ...result } = buscaUsuario
-		return result
+		const usuarioSemSenha = { ...buscaUsuario }
+		delete usuarioSemSenha.senha
+		return usuarioSemSenha
 	}
 
 	async login(usuario: Usuario): Promise<UsuarioAutenticado> {
-		const payload = {
-			sub: usuario.id,
-			usuario: usuario.usuario,
-			nome: usuario.nome,
-			roles: usuario.roles.map((role) => role.nome),
-		}
-
-		const token = this.jwtService.sign(payload)
+		const token = this.gerarToken(usuario.usuario)
 
 		return {
 			id: usuario.id,
@@ -65,7 +61,7 @@ export class SecurityService {
 
 	private validarCredenciais(usuario: string, senha: string): void {
 		if (!usuario?.trim() || !senha?.trim()) {
-			throw new HttpException(ErrorMessages.AUTH.CREDENTIALS_REQUIRED, HttpStatus.BAD_REQUEST)
+			throw new BadRequestException(ErrorMessages.AUTH.CREDENTIALS_REQUIRED)
 		}
 	}
 

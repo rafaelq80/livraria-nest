@@ -1,4 +1,4 @@
-﻿import { HttpException, HttpStatus, Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common"
+﻿import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { QueryRunner, Repository } from "typeorm"
 import { ImageKitService } from "../../imagekit/services/imagekit.service"
@@ -100,7 +100,7 @@ export class UsuarioService {
 
 	async update(usuario: Usuario, fotoFile?: Express.Multer.File): Promise<Usuario> {
 		if (!usuario?.id) {
-			throw new HttpException("Usuário inválido!", HttpStatus.BAD_REQUEST)
+			throw new BadRequestException("Usuário inválido!")
 		}
 
 		const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
@@ -219,9 +219,8 @@ export class UsuarioService {
 			`Erro ao atualizar usuario: ${(error as Error).message}`,
 			(error as Error).stack,
 		)
-		throw new HttpException(
-			`Erro ao atualizar usuario: ${(error as Error).message}`,
-			error instanceof HttpException ? error.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR,
+		throw new BadRequestException(
+			`Erro ao atualizar usuario: ${(error as Error).message}`
 		)
 	}
 

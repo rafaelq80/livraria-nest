@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable } from "@nestjs/common"
+import { BadRequestException, Injectable } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { HttpService } from "@nestjs/axios"
 import { lastValueFrom } from "rxjs"
@@ -21,12 +21,11 @@ export class ImageKitService {
 		this.imageKitUrl = this.configService.get<string>("IMAGEKIT_URL_ENDPOINT")
 		this.imageKitPrivateKey = this.configService.get<string>("IMAGEKIT_PRIVATE_KEY")
 		
-		// Validar se as configurações necessárias existem
 		if (!this.imageKitUrl) {
-			throw new Error("IMAGEKIT_URL_ENDPOINT não configurado")
+			throw new BadRequestException(ErrorMessages.IMAGE.INVALID_URL)
 		}
 		if (!this.imageKitPrivateKey) {
-			throw new Error("IMAGEKIT_PRIVATE_KEY não configurado")
+			throw new BadRequestException(ErrorMessages.IMAGE.INVALID_URL)
 		}
 	}
 
@@ -72,9 +71,8 @@ export class ImageKitService {
 			return await this.uploadImage(file, `uploads/livraria/${imagekitDto.recurso}`)
 		} catch (error) {
 			console.error("Erro ao processar imagem:", error)
-			throw new HttpException(
-				"Erro interno ao processar imagem",
-				HttpStatus.INTERNAL_SERVER_ERROR
+			throw new BadRequestException(
+				"Erro interno ao processar imagem"
 			)
 		}
 	}
@@ -145,7 +143,7 @@ export class ImageKitService {
 
 	private async uploadImage(image: Express.Multer.File, folder: string): Promise<string> {
 		if (!image) {
-			throw new HttpException(ErrorMessages.IMAGE.NOT_PROVIDED, HttpStatus.BAD_REQUEST)
+			throw new BadRequestException(ErrorMessages.IMAGE.NOT_PROVIDED)
 		}
 
 		this.validateImage(image)
@@ -156,21 +154,17 @@ export class ImageKitService {
 
 	private validateImage(image: Express.Multer.File): void {
 		if (!image) {
-			throw new HttpException(ErrorMessages.IMAGE.NOT_PROVIDED, HttpStatus.BAD_REQUEST)
+			throw new BadRequestException(ErrorMessages.IMAGE.NOT_PROVIDED)
 		}
 
 		if (!image.mimetype || !this.ALLOWED_TYPES.includes(image.mimetype)) {
-			throw new HttpException(
-				`${ErrorMessages.IMAGE.INVALID_FORMAT} Formatos permitidos: ${this.ALLOWED_TYPES.join(", ")}`,
-				HttpStatus.BAD_REQUEST,
+			throw new BadRequestException(
+				`${ErrorMessages.IMAGE.INVALID_FORMAT} Formatos permitidos: ${this.ALLOWED_TYPES.join(", ")}`
 			)
 		}
 
 		if (!image.size || image.size > this.MAX_FILE_SIZE) {
-			throw new HttpException(
-				ErrorMessages.IMAGE.SIZE_EXCEEDED,
-				HttpStatus.BAD_REQUEST,
-			)
+			throw new BadRequestException(ErrorMessages.IMAGE.SIZE_EXCEEDED)
 		}
 	}
 
@@ -193,34 +187,21 @@ export class ImageKitService {
 	}
 
 	private async postImage(form: FormData): Promise<string> {
-		if (!form) {
-			throw new Error("FormData não fornecido")
-		}
-
 		try {
 			const response = await lastValueFrom(
 				this.httpService.post<ImagekitResponse>(this.imageKitUrl, form, {
 					headers: this.getAuthHeaders(),
-					timeout: 30000, // 30 segundos de timeout
 				}),
 			)
 
-			if (!response?.data?.url) {
-				throw new Error("URL da imagem não retornada pelo ImageKit")
+			if (!response.data?.url) {
+				throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
 			}
 
 			return response.data.url
 		} catch (error) {
 			console.error("Erro ao fazer upload da imagem:", error)
-			
-			if (error.response) {
-				console.error("Resposta do erro:", error.response.status, error.response.data)
-			}
-			
-			throw new HttpException(
-				"Erro ao fazer upload da imagem para o ImageKit",
-				HttpStatus.INTERNAL_SERVER_ERROR
-			)
+			throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
 		}
 	}
 
@@ -275,71 +256,24 @@ export class ImageKitService {
 
 	private async processImage(buffer: Buffer): Promise<Buffer> {
 		if (!buffer || buffer.length === 0) {
-			throw new HttpException("Buffer da imagem está vazio", HttpStatus.BAD_REQUEST)
+			throw new BadRequestException(ErrorMessages.IMAGE.NOT_PROVIDED)
 		}
 
 		try {
 			const image = await loadImage(buffer)
-
-			if (!image || !image.width || !image.height) {
-				throw new Error("Imagem inválida ou corrompida")
-			}
-
-			// Calculate new dimensions while maintaining aspect ratio
-			let width = image.width
-			let height = image.height
-			const maxDimension = 800
-
-			if (width > maxDimension || height > maxDimension) {
-				if (width > height) {
-					height = Math.round((height * maxDimension) / width)
-					width = maxDimension
-				} else {
-					width = Math.round((width * maxDimension) / height)
-					height = maxDimension
-				}
-			}
-
-			// Garantir dimensões mínimas
-			width = Math.max(width, 1)
-			height = Math.max(height, 1)
-
-			const canvas = createCanvas(width, height)
+			const canvas = createCanvas(image.width, image.height)
 			const ctx = canvas.getContext("2d")
-
-			if (!ctx) {
-				throw new Error("Não foi possível criar contexto do canvas")
-			}
-
-			// Use only imageSmoothingEnabled
-			ctx.imageSmoothingEnabled = true
-
-			// Draw image with resize
-			ctx.drawImage(image, 0, 0, width, height)
-
-			// Convert to buffer with JPEG encoding
-			const processedBuffer = canvas.toBuffer("image/jpeg", {
-				quality: 0.8,
-				progressive: true,
-			})
-
-			if (!processedBuffer || processedBuffer.length === 0) {
-				throw new Error("Falha ao gerar buffer da imagem processada")
-			}
-
-			return processedBuffer
+			ctx.drawImage(image, 0, 0)
+			return canvas.toBuffer("image/jpeg", { quality: 0.8 })
 		} catch (error) {
 			console.error("Erro ao processar imagem:", error)
-			throw new HttpException(
-				`Erro ao processar a imagem: ${error.message}`,
-				HttpStatus.INTERNAL_SERVER_ERROR
-			)
+			throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
 		}
 	}
 
 	private async downloadImage(url: string): Promise<Buffer> {
 		if (!url || typeof url !== 'string') {
-			throw new HttpException(ErrorMessages.IMAGE.INVALID_URL, HttpStatus.BAD_REQUEST)
+			throw new BadRequestException(ErrorMessages.IMAGE.INVALID_URL)
 		}
 
 		try {
@@ -351,23 +285,20 @@ export class ImageKitService {
 			)
 
 			if (!response.data) {
-				throw new Error("Resposta vazia ao baixar imagem")
+				throw new BadRequestException(ErrorMessages.IMAGE.DOWNLOAD_ERROR)
 			}
 
 			return Buffer.from(response.data)
 		} catch (error: unknown) {
 			const errorMessage = error instanceof Error ? error.message : String(error)
 			console.error("Erro ao baixar imagem:", errorMessage)
-			throw new HttpException(
-				`${ErrorMessages.IMAGE.DOWNLOAD_ERROR} ${errorMessage}`,
-				HttpStatus.BAD_REQUEST
-			)
+			throw new BadRequestException(ErrorMessages.IMAGE.DOWNLOAD_ERROR)
 		}
 	}
 
 	private getAuthHeaders() {
 		if (!this.imageKitPrivateKey) {
-			throw new Error("Chave privada do ImageKit não configurada")
+			throw new BadRequestException(ErrorMessages.IMAGE.INVALID_URL)
 		}
 
 		const credentials = `${this.imageKitPrivateKey}:`

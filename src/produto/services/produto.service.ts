@@ -108,7 +108,7 @@ export class ProdutoService {
 		try {
 			await queryRunner.manager.update(Produto, produto.id, {
 				titulo: produto.titulo,
-				descricao: produto.descricao,
+				sinopse: produto.sinopse,
 				preco: produto.preco,
 				desconto: produto.desconto,
 				isbn10: produto.isbn10,

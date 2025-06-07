@@ -1,5 +1,5 @@
 ﻿import { Transform, TransformFnParams } from "class-transformer"
-import { IsEmail, IsNotEmpty, MinLength } from "class-validator"
+import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsString, Length, Matches } from "class-validator"
 import {
 	Column,
 	CreateDateColumn,
@@ -14,38 +14,66 @@ import { ApiProperty } from "@nestjs/swagger"
 
 @Entity({ name: "tb_usuarios" })
 export class Usuario {
-	@ApiProperty()
+	@ApiProperty({ description: 'ID do usuário' })
 	@PrimaryGeneratedColumn()
 	id: number
 
+	@ApiProperty({ 
+		description: 'ID do Google (para login com Google)',
+		required: false
+	})
+	@IsOptional()
+	@IsString({ message: 'Google ID deve ser uma string' })
 	@Column({ nullable: true })
 	googleId?: string
 
-	@ApiProperty()
+	@ApiProperty({ 
+		description: 'Nome completo do usuário',
+		example: 'João da Silva'
+	})
 	@Transform(({ value }: TransformFnParams) => value?.trim())
-	@IsNotEmpty()
+	@IsNotEmpty({ message: 'Nome é obrigatório' })
+	@IsString({ message: 'Nome deve ser uma string' })
+	@Length(2, 255, { message: 'Nome deve ter entre 2 e 255 caracteres' })
 	@Column({ length: 255, nullable: false })
 	nome: string
 
-	@ApiProperty()
+	@ApiProperty({ 
+		description: 'Email do usuário',
+		example: 'joao@email.com'
+	})
 	@Transform(({ value }: TransformFnParams) => value?.trim())
-	@IsEmail()
-	@IsNotEmpty()
+	@IsEmail({}, { message: 'Email inválido' })
+	@IsNotEmpty({ message: 'Email é obrigatório' })
 	@Column({ length: 255, nullable: false })
 	usuario: string
 
-	@ApiProperty()
+	@ApiProperty({ 
+		description: 'Senha do usuário',
+		example: 'Senha@123'
+	})
 	@Transform(({ value }: TransformFnParams) => value?.trim())
-	@MinLength(8)
-	@IsNotEmpty()
+	@IsNotEmpty({ message: 'Senha é obrigatória' })
+	@MinLength(8, { message: 'Senha deve ter no mínimo 8 caracteres' })
+	@Matches(
+		/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+		{ message: 'A senha deve conter pelo menos uma letra maiúscula, uma minúscula, um número e um caractere especial' }
+	)
 	@Column({ type: "varchar", length: 255, nullable: false })
 	senha: string
 
-	@ApiProperty()
+	@ApiProperty({ 
+		description: 'URL da foto do usuário',
+		example: 'https://example.com/foto.jpg',
+		required: false
+	})
+	@IsOptional()
+	@IsString({ message: 'URL da foto deve ser uma string' })
+	@Length(5, 5000, { message: 'URL da foto deve ter entre 5 e 5000 caracteres' })
 	@Column({ type: "varchar", length: 5000, nullable: true })
 	foto?: string
 
-	@ApiProperty()
+	@ApiProperty({ type: () => Role, isArray: true, description: 'Roles do usuário' })
 	@ManyToMany(() => Role, (role) => role.usuarios, { eager: false, cascade: true })
 	@JoinTable({
 		name: "tb_usuarios_roles",
@@ -54,12 +82,11 @@ export class Usuario {
 	})
 	roles: Role[]
 
-	// Campos de auditoria
-	@ApiProperty({ description: "Data de criação do registro" })
+	@ApiProperty({ description: 'Data de criação do registro' })
 	@CreateDateColumn({ name: "created_at" })
 	createdAt: Date
 
-	@ApiProperty({ description: "Data de última atualização do registro" })
+	@ApiProperty({ description: 'Data de última atualização do registro' })
 	@UpdateDateColumn({ name: "updated_at" })
 	updatedAt: Date
 }

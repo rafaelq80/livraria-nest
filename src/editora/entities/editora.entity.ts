@@ -20,7 +20,10 @@ export class Editora {
   @PrimaryGeneratedColumn() 
   id: number;
 
-  @ApiProperty({ description: 'Nome da editora', example: 'Companhia das Letras' })
+  @ApiProperty({ 
+    description: 'Nome da editora', 
+    example: 'Companhia das Letras' 
+  })
   @Transform(({ value }: TransformFnParams) => value?.trim())
   @IsNotEmpty({ message: 'Nome da editora é obrigatório' })
   @Length(2, 255, { message: 'Nome deve ter entre 2 e 255 caracteres' })
@@ -38,5 +41,4 @@ export class Editora {
   @ApiProperty({ type: () => Produto, isArray: true, description: 'Produtos da editora' })
   @OneToMany(() => Produto, (produto) => produto.editora, { lazy: true })
   produtos: Produto[];
-  
 }

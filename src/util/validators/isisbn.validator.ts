@@ -21,7 +21,7 @@ export class IsISBNConstraint implements ValidatorConstraintInterface {
     }
 }
 
-export function IsISBN(validationOptions?: ValidationOptions) {
+export function IsISBN(p0: string, validationOptions?: ValidationOptions) {
     return function (object: object, propertyName: string) {
         registerDecorator({
             target: object.constructor,

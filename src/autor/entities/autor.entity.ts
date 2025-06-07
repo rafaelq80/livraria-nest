@@ -1,16 +1,16 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, TransformFnParams } from 'class-transformer';
 import { IsNotEmpty, IsOptional, IsString, Length } from 'class-validator';
-import { 
-  Column, 
-  Entity, 
-  ManyToMany, 
-  PrimaryGeneratedColumn,
+import {
+  Column,
   CreateDateColumn,
-  UpdateDateColumn,
-  Index
+  Entity,
+  Index,
+  ManyToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn
 } from 'typeorm';
 import { Produto } from '../../produto/entities/produto.entity';
-import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('tb_autores')
 @Index('IDX_AUTOR_NOME', ['nome'])
@@ -20,7 +20,10 @@ export class Autor {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ApiProperty({ description: 'Nome completo do autor', example: 'Machado de Assis' })
+  @ApiProperty({ 
+    description: 'Nome completo do autor', 
+    example: 'Machado de Assis' 
+  })
   @Transform(({ value }: TransformFnParams) => value?.trim())
   @IsNotEmpty({ message: 'Nome do autor é obrigatório' })
   @Length(2, 255, { message: 'Nome deve ter entre 2 e 255 caracteres' })
@@ -34,7 +37,7 @@ export class Autor {
   })
   @Transform(({ value }: TransformFnParams) => value?.trim())
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Nacionalidade deve ser uma string' })
   @Length(2, 100, { message: 'Nacionalidade deve ter entre 2 e 100 caracteres' })
   @Column({ length: 100, nullable: true })
   nacionalidade?: string;
@@ -50,5 +53,4 @@ export class Autor {
   @ApiProperty({ type: () => Produto, isArray: true, description: 'Produtos do autor' })
   @ManyToMany(() => Produto, (produto) => produto.autores, { lazy: true })
   produtos: Produto[];
-  
 }

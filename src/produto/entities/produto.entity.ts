@@ -1,11 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, TransformFnParams } from 'class-transformer';
 import {
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
-  IsUrl,
   Length,
   Max,
   Min
@@ -37,92 +37,111 @@ export class Produto {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ApiProperty({ description: 'Título do livro' })
+  @ApiProperty({ 
+    description: 'Título do livro',
+    example: 'Dom Casmurro'
+  })
   @Transform(({ value }: TransformFnParams) => value?.trim())
   @IsNotEmpty({ message: 'Título é obrigatório' })
-  @Length(1, 255, { message: 'Título deve ter entre 1 e 255 caracteres' })
+  @Length(2, 255, { message: 'Título deve ter entre 2 e 255 caracteres' })
   @Column({ length: 255, nullable: false })
   titulo: string;
 
-  @ApiProperty({ description: 'Descrição detalhada do livro' })
+  @ApiProperty({ 
+    description: 'Sinopse do livro',
+    example: 'Dom Casmurro é um romance escrito por Machado de Assis...'
+  })
   @Transform(({ value }: TransformFnParams) => value?.trim())
-  @IsString()
-  @IsOptional()
-  @Length(0, 2000, { message: 'Descrição deve ter no máximo 2000 caracteres' })
-  @Column({ type: 'text', nullable: true })
-  descricao?: string;
+  @IsNotEmpty({ message: 'Sinopse é obrigatória' })
+  @Length(10, 5000, { message: 'Sinopse deve ter entre 10 e 5000 caracteres' })
+  @Column({ type: 'text', nullable: false })
+  sinopse: string;
 
-  @ApiProperty({ description: 'Preço do livro', example: 29.99 })
-  @Transform(({ value }) => parseFloat(value))
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Preço deve ter no máximo 2 casas decimais' })
-  @Min(0.01, { message: 'Preço deve ser maior que zero' })
-  @Max(9999999.99, { message: 'Preço muito alto' })
+  @ApiProperty({ 
+    description: 'Preço do livro',
+    example: 49.90,
+    minimum: 0
+  })
   @IsNotEmpty({ message: 'Preço é obrigatório' })
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Min(0, { message: 'Preço não pode ser negativo' })
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: false })
   preco: number;
 
-  @ApiProperty({
-    example: 0,
-    description: 'Percentual de desconto (de 0 a 100) do livro',
-    default: 0,
-  })
-  @Transform(({ value }) => value ? parseFloat(value) : 0)
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Desconto deve ter no máximo 2 casas decimais' })
-  @Min(0, { message: 'Desconto não pode ser negativo' })
-  @Max(100, { message: 'Desconto não pode ser maior que 100%' })
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
-  desconto: number = 0;
-
   @ApiProperty({ 
-    description: 'URL da foto da capa do livro',
-    example: 'https://example.com/capa.jpg'
+    description: 'Foto do livro',
+    example: 'https://example.com/foto.jpg',
+    required: false
   })
   @IsOptional()
-  @IsUrl({}, { message: 'URL da foto inválida' })
-  @Length(0, 500, { message: 'URL da foto muito longa' })
-  @Column({ type: 'varchar', length: 500, nullable: true })
+  @IsString({ message: 'Foto deve ser uma string' })
+  @Length(5, 5000, { message: 'Foto deve ter entre 5 e 5000 caracteres' })
+  @Column({ length: 5000, nullable: true })
   foto?: string;
 
-  @ApiProperty({ description: 'Número total de páginas do livro' })
-  @Transform(({ value }) => value ? parseInt(value) : undefined)
-  @IsOptional()
-  @IsNumber({}, { message: 'Páginas deve ser um número' })
+  @ApiProperty({ 
+    description: 'Número de páginas',
+    example: 256,
+    minimum: 1
+  })
+  @IsNotEmpty({ message: 'Número de páginas é obrigatório' })
   @Min(1, { message: 'Número de páginas deve ser maior que zero' })
-  @Max(50000, { message: 'Número de páginas muito alto' })
-  @Column({ type: 'int', nullable: true })
-  paginas?: number;
+  @Column({ type: 'int', nullable: false })
+  paginas: number;
 
   @ApiProperty({ 
-    description: 'Idioma do livro', 
+    description: 'Ano de publicação',
+    example: 2023,
+    minimum: 1800
+  })
+  @IsNotEmpty({ message: 'Ano de publicação é obrigatório' })
+  @Min(1800, { message: 'Ano de publicação deve ser maior que 1800' })
+  @Max(new Date().getFullYear(), { message: 'Ano de publicação não pode ser maior que o ano atual' })
+  @Column({ type: 'int', nullable: false })
+  anoPublicacao: number;
+
+  @ApiProperty({ 
+    description: 'Idioma do livro',
     example: 'Português',
     enum: ['Português', 'Inglês', 'Espanhol', 'Francês', 'Alemão', 'Italiano', 'Outros']
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Idioma deve ser uma string' })
   @Length(2, 50, { message: 'Idioma deve ter entre 2 e 50 caracteres' })
+  @IsIn(['Português', 'Inglês', 'Espanhol', 'Francês', 'Alemão', 'Italiano', 'Outros'], 
+    { message: 'Idioma deve ser um dos valores permitidos' })
   @Column({ length: 50, nullable: true, default: 'Português' })
   idioma?: string;
 
   @ApiProperty({ 
-    description: 'ISBN-10 do livro', 
+    description: 'ISBN-10 do livro',
     example: '0-306-40615-2',
     required: false
   })
   @IsOptional()
-  @IsISBN({ message: 'ISBN-10 inválido.' })
+  @IsISBN('10', { message: 'ISBN-10 inválido' })
   @Column({ length: 17, nullable: true, unique: true })
   isbn10?: string;
 
   @ApiProperty({ 
-    description: 'ISBN-13 do livro', 
+    description: 'ISBN-13 do livro',
     example: '978-3-16-148410-0',
     required: false
   })
   @IsOptional()
-  @IsISBN({ message: 'ISBN-13 inválido.' })
+  @IsISBN('13', { message: 'ISBN-13 inválido' })
   @Column({ length: 20, nullable: true, unique: true })
   isbn13?: string;
 
+  @ApiProperty({ 
+    description: 'Desconto do livro',
+    example: 10,
+    minimum: 0,
+    maximum: 100
+  })
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false }, { message: 'Desconto deve ser um número' })
+  desconto: number;
+  
   // Campos de auditoria
   @ApiProperty({ description: 'Data de criação do registro' })
   @CreateDateColumn({ name: 'created_at' })
@@ -163,11 +182,12 @@ export class Produto {
   })
   @JoinColumn({ name: 'editora_id' })
   editora: Editora;
+ 
 
   // Propriedades calculadas
   @ApiProperty({ description: 'Preço com desconto aplicado' })
   get precoComDesconto(): number {
-    return this.preco * (1 - this.desconto / 100);
+    return this.preco * (1 - (this.desconto || 0) / 100);
   }
 
   @ApiProperty({ description: 'Indica se o produto tem desconto' })

@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, Injectable, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { In, Repository } from "typeorm"
 import { ErrorMessages } from "../../common/constants/error-messages"
@@ -93,8 +93,7 @@ export class RoleService {
 			const roles = roleIds.map((id) => rolesMap.get(id))
 
 			return { ...usuario, roles }
-		} catch (error) {
-			if (error instanceof HttpException) throw error
+		} catch {
 			throw new BadRequestException(ErrorMessages.ROLE.INVALID_DATA)
 		}
 	}
