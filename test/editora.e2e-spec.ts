@@ -36,6 +36,73 @@ describe("Editora E2E Tests", () => {
 		})
 	})
 
+	describe("GET /editoras/:id", () => {
+		it("deve retornar editora quando ID existir", async () => {
+			
+			const novoEditora: EditoraCreateDto = {
+				nome: "Sextante"
+			}
+
+			const createResponse = await request(app.getHttpServer())
+				.post("/editoras")
+				.set("Authorization", "Bearer mock-token")
+				.send(novoEditora)
+				.expect(HttpStatus.CREATED)
+
+			const response = await request(app.getHttpServer())
+				.get(`/editoras/${createResponse.body.id}`)
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.OK)
+
+			expect(response.body).toMatchObject({
+				id: createResponse.body.id,
+				nome: novoEditora.nome
+			})
+		})
+
+		it("deve retornar 404 quando ID não existir", async () => {
+			await request(app.getHttpServer())
+				.get("/editoras/999")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.NOT_FOUND)
+		})
+	})
+
+	describe("GET /editoras/nome/:nome", () => {
+		it("deve retornar lista de editoras quando nome existir", async () => {
+			const novoEditora: EditoraCreateDto = {
+				nome: "Melhoramentos"
+			}
+
+			await request(app.getHttpServer())
+				.post("/editoras")
+				.set("Authorization", "Bearer mock-token")
+				.send(novoEditora)
+				.expect(HttpStatus.CREATED)
+
+			const response = await request(app.getHttpServer())
+				.get(`/editoras/nome/${novoEditora.nome}`)
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.OK)
+
+			expect(response.body).toBeInstanceOf(Array)
+			expect(response.body.length).toBeGreaterThan(0)
+			expect(response.body[0]).toMatchObject({
+				nome: novoEditora.nome
+			})
+		})
+
+		it("deve retornar lista vazia quando nome não existir", async () => {
+			const response = await request(app.getHttpServer())
+				.get("/editoras/nome/NomeInexistente")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.OK)
+
+			expect(response.body).toBeInstanceOf(Array)
+			expect(response.body.length).toBe(0)
+		})
+	})
+
 	describe("POST /editoras", () => {
 		it("Deve criar uma nova Editora", async () => {
 			const novaEditora: EditoraCreateDto = {
