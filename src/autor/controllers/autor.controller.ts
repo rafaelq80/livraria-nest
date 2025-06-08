@@ -27,7 +27,7 @@ export class AutorController{
     @Get('/nome/:nome')
     @HttpCode(HttpStatus.OK)
     findByNome(@Param('nome') nome: string): Promise<Autor[]>{
-        return this.autorService.findByNome(nome);
+        return this.autorService.findAllByNome(nome);
     }
 
     @Post() 

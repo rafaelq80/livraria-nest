@@ -1,6 +1,6 @@
 ﻿import { Module } from "@nestjs/common"
 import { ConfigModule, ConfigService } from "@nestjs/config"
-import { APP_GUARD, Reflector } from "@nestjs/core";
+import { Reflector } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt"
 import { PassportModule } from "@nestjs/passport"
 import { RoleModule } from "../role/role.module"
@@ -13,7 +13,6 @@ import { SecurityService } from "./services/security.service"
 import { GoogleStrategy } from "./strategies/google.strategy"
 import { JwtStrategy } from "./strategies/jwt.strategy"
 import { LocalStrategy } from "./strategies/local.strategy"
-import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { GoogleController } from "./controllers/google.controller";
 
 @Module({
@@ -34,10 +33,6 @@ import { GoogleController } from "./controllers/google.controller";
 		}),
 	],
 	providers: [
-		{
-			provide: APP_GUARD,
-			useClass: JwtAuthGuard,
-		},
 		Reflector,
 		Bcrypt,
 		SecurityService,

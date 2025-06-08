@@ -51,7 +51,7 @@ export class AutorService {
 		return new Map(autores.map((autor) => [autor.id, autor]))
 	}
 
-	async findByNome(nome: string): Promise<Autor[]> {
+	async findAllByNome(nome: string): Promise<Autor[]> {
 		return await this.autorRepository.find({
 			where: {
 				nome: ILike(`%${nome.trim()}%`),
@@ -62,7 +62,7 @@ export class AutorService {
 	}
 
 	async create(autor: Autor): Promise<Autor> {
-		if (!autor) throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
+		if (!autor?.nome?.trim()) throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
 
 		return await this.autorRepository.save(autor)
 	}
@@ -95,7 +95,7 @@ export class AutorService {
 		}
 
 		const autoresMap = await this.findManyByIds(autorIds)
-		return autorIds.map((id) => autoresMap.get(id)!)
+		return autorIds.map((id) => autoresMap.get(id))
 	}
 
 	private extrairIdsValidos(autores: Autor[] | string | unknown[]): number[] {

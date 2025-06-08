@@ -1,37 +1,26 @@
-import { Injectable } from "@nestjs/common"
+import { Injectable, Logger } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
-import * as nodemailer from "nodemailer"
+import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class SendmailService {
-	private readonly transporter: nodemailer.Transporter
+	private readonly transporter: nodemailer.Transporter;
+	private readonly logger = new Logger(SendmailService.name);
 
 	constructor(private readonly configService: ConfigService) {
 		this.transporter = nodemailer.createTransport({
-			service: "gmail",
+			service: 'gmail',
 			auth: {
-				user: this.configService.get<string>("EMAIL_USER"),
-				pass: this.configService.get<string>("EMAIL_PASSWORD"),
+				user: this.configService.get<string>("MAIL_USER"),
+				pass: this.configService.get<string>("MAIL_PASS"),
 			},
-			tls: {
-				// Desativa a verificação do certificado - use apenas em ambiente de desenvolvimento
-				rejectUnauthorized: false,
-			},
-		})
-
-		this.transporter.verify(function (error) {
-			if (error) {
-				console.error("Erro na conexão com Mailtrap:", error)
-			} else {
-				console.log("Servidor de e-mail pronto para enviar mensagens")
-			}
-		})
+		});
 	}
 
 	async sendmailConfirmacao(nome: string, usuario: string): Promise<void> {
 		try {
 			await this.transporter.sendMail({
-				from: this.configService.get<string>("EMAIL_USER"),
+				from: this.configService.get<string>("MAIL_USER"),
 				to: usuario,
 				subject: "Confirmação de Cadastro",
 				html: `
@@ -42,17 +31,18 @@ export class SendmailService {
           <p>Atenciosamente,<br/>Equipe de Suporte - Projeto Livraria</p>
         </div>
       `,
-			})
-			console.log(`E-mail de Confirmação de Cadastro enviado para ${usuario}`)
+			});
+			this.logger.log(`E-mail de Confirmação de Cadastro enviado para ${usuario}`);
 		} catch (error) {
-			console.error("Erro ao enviar E-mail de Confirmação de Cadastro:", error)
+			this.logger.error("Erro ao enviar E-mail de Confirmação de Cadastro:", error);
+			throw error;
 		}
 	}
 
 	async sendmailRecuperarSenha(nome: string, usuario: string, resetLink: string): Promise<void> {
 		try {
 			await this.transporter.sendMail({
-				from: this.configService.get<string>("EMAIL_USER"),
+				from: this.configService.get<string>("MAIL_USER"),
 				to: usuario,
 				subject: "Recuperação de Senha",
 				html: `
@@ -66,10 +56,11 @@ export class SendmailService {
               <p>Atenciosamente,<br/>Equipe de Suporte - Projeto Livraria</p>
             </div>
             `,
-			})
-			console.log(`E-mail de Recuperação de Senha enviado para ${usuario}`)
+			});
+			this.logger.log(`E-mail de Recuperação de Senha enviado para ${usuario}`);
 		} catch (error) {
-			console.error("Erro ao enviar o E-mail de Recuperação de Senha:", error)
+			this.logger.error("Erro ao enviar o E-mail de Recuperação de Senha:", error);
+			throw error;
 		}
 	}
 }

@@ -1,11 +1,19 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AppModule } from './app.module';
 
 async function bootstrap() {
   
   const app = await NestFactory.create(AppModule);
+
+  // Configurações de segurança
+  //app.use(helmet());
+  app.enableCors({
+    origin: process.env.FRONTEND_URL || '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    credentials: true,
+  });
 
   const config = new DocumentBuilder()
   .setTitle('Projeto Livraria')
@@ -20,7 +28,6 @@ async function bootstrap() {
   process.env.TZ  = 'America/Sao_Paulo';
 
   app.useGlobalPipes(new ValidationPipe());
-  app.enableCors();
 
   await app.listen(process.env.PORT ?? 4000);
 

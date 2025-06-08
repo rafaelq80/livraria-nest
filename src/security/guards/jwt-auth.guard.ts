@@ -9,6 +9,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const publicRoutes = [
       '/auth/google',
       '/auth/google/callback',
+      '/usuarios/cadastrar',
       '/usuarios/logar',
       '/usuarios/recuperarsenha',
       '/usuarios/atualizarsenha'

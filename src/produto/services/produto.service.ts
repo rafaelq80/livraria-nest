@@ -50,7 +50,7 @@ export class ProdutoService {
 		return produto
 	}
 
-	async findByTitulo(titulo: string): Promise<Produto[]> {
+	async findAllByTitulo(titulo: string): Promise<Produto[]> {
 		return await this.produtoRepository.find({
 			where: {
 				titulo: ILike(`%${titulo.trim()}%`),
@@ -67,7 +67,6 @@ export class ProdutoService {
 	}
 
 	async create(produto: Produto, fotoFile: Express.Multer.File): Promise<Produto> {
-		
 		const [categoria, editora] = await this.validarCategoriaEditora(produto);
 
 		produto.categoria = categoria

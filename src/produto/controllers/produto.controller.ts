@@ -14,7 +14,7 @@ import {
 	Put,
 	UploadedFile,
 	UseGuards,
-	UseInterceptors,
+	UseInterceptors
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger"
@@ -48,7 +48,7 @@ export class ProdutoController {
 	@Get("/titulo/:titulo")
 	@HttpCode(HttpStatus.OK)
 	findByTitulo(@Param("titulo") titulo: string): Promise<Produto[]> {
-		return this.produtoService.findByTitulo(titulo)
+		return this.produtoService.findAllByTitulo(titulo)
 	}
 
 	@UseGuards(JwtAuthGuard)
@@ -66,7 +66,7 @@ export class ProdutoController {
 				fileIsRequired: false,
 			}),
 		)
-		fotoFile: Express.Multer.File,
+		fotoFile?: Express.Multer.File,
 	): Promise<Produto> {
 		const autores = await this.autorService.processarAutores(produto)
 		produto.autores = autores

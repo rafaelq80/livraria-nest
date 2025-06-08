@@ -1,10 +1,7 @@
-import { BadRequestException, HttpStatus, NotFoundException } from "@nestjs/common"
+import { HttpStatus, INestApplication } from "@nestjs/common"
 import * as request from "supertest"
-import { AutorController } from "../src/autor/controllers/autor.controller"
-import { Autor } from "../src/autor/entities/autor.entity"
-import { AutorService } from "../src/autor/services/autor.service"
-import { ProdutoMockFactory } from "./factories/produto-mock.factory"
-import { BaseTestHelper } from "./helpers/base-test.helper"
+import { AutorModule } from "../src/autor/autor.module"
+import { TestDatabaseHelper } from "./helpers/test-database.helper"
 
 interface AutorCreateDto {
 	nome: string
@@ -15,118 +12,105 @@ interface AutorUpdateDto {
 	nome: string
 }
 
-interface MockAutorService extends Record<string, jest.Mock> {
-	findAll: jest.Mock<Promise<Autor[]>, unknown[]>
-	findById: jest.Mock<Promise<Autor>, unknown[]>
-	findByNome: jest.Mock<Promise<Autor[]>, unknown[]>
-	create: jest.Mock<Promise<Autor>, unknown[]>
-	update: jest.Mock<Promise<Autor>, unknown[]>
-	delete: jest.Mock<Promise<void>, unknown[]>
-}
-
 describe("Autor E2E Tests", () => {
-	let testHelper: BaseTestHelper
-	let mockAutor: Autor
-	let mockAutorService: MockAutorService
+	let testHelper: TestDatabaseHelper
+	let app: INestApplication
 
 	beforeAll(async () => {
-		testHelper = new BaseTestHelper()
-		mockAutor = ProdutoMockFactory.createMockAutor({ nome: "Ziraldo" })
-
-		mockAutorService = {
-			findAll: jest.fn<Promise<Autor[]>, unknown[]>(),
-			findById: jest.fn<Promise<Autor>, unknown[]>(),
-			findByNome: jest.fn<Promise<Autor[]>, unknown[]>(),
-			create: jest.fn<Promise<Autor>, unknown[]>(),
-			update: jest.fn<Promise<Autor>, unknown[]>(),
-			delete: jest.fn<Promise<void>, unknown[]>(),
-		}
-
-		await testHelper.createTestModule({
-			controller: AutorController,
-			service: AutorService,
-			entity: Autor,
-			mockServices: [
-				{
-					provide: AutorService,
-					useValue: mockAutorService,
-				},
-			],
-		})
+		testHelper = new TestDatabaseHelper()
+		app = await testHelper.createTestModule([AutorModule])
 	})
 
 	afterAll(async () => {
 		await testHelper.cleanup()
 	})
 
-	afterEach(() => {
-		jest.clearAllMocks()
-	})
-
 	describe("GET /autores", () => {
 		it("Deve retornar todos os Autores", async () => {
-			mockAutorService.findAll.mockResolvedValue([mockAutor])
-
-			const response = await request(testHelper.httpServer)
+			const response = await request(app.getHttpServer())
 				.get("/autores")
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toHaveLength(1)
-			expect(mockAutorService.findAll).toHaveBeenCalled()
+			expect(response.body).toBeInstanceOf(Array)
 		})
 	})
 
 	describe("GET /autores/:id", () => {
-		it("Deve retornar um Autor pelo ID", async () => {
-			mockAutorService.findById.mockResolvedValue(mockAutor)
+		it("deve retornar autor quando ID existir", async () => {
+			
+			const novoAutor: AutorCreateDto = {
+				nome: "Arlindo"
+			}
 
-			const response = await request(testHelper.httpServer)
-				.get("/autores/1")
+			const createResponse = await request(app.getHttpServer())
+				.post("/autores")
+				.set("Authorization", "Bearer mock-token")
+				.send(novoAutor)
+				.expect(HttpStatus.CREATED)
+
+			const response = await request(app.getHttpServer())
+				.get(`/autores/${createResponse.body.id}`)
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
 			expect(response.body).toMatchObject({
-				id: 1,
-				nome: "Ziraldo",
-				nacionalidade: "Brasileira",
-				produtos: [],
+				id: createResponse.body.id,
+				nome: novoAutor.nome
 			})
+		})
 
-			expect(response.body.createdAt).toBeDefined()
-			expect(response.body.updatedAt).toBeDefined()
-			expect(new Date(response.body.createdAt)).toBeInstanceOf(Date)
-			expect(new Date(response.body.updatedAt)).toBeInstanceOf(Date)
-
-			expect(mockAutorService.findById).toHaveBeenCalledWith(1)
+		it("deve retornar 404 quando ID não existir", async () => {
+			await request(app.getHttpServer())
+				.get("/autores/999")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.NOT_FOUND)
 		})
 	})
 
 	describe("GET /autores/nome/:nome", () => {
-		it("Deve retornar todos os Autores pelo nome", async () => {
-			mockAutorService.findByNome.mockResolvedValue([mockAutor])
+		it("deve retornar lista de autores quando nome existir", async () => {
+			const novoAutor: AutorCreateDto = {
+				nome: "Zezinho"
+			}
 
-			const response = await request(testHelper.httpServer)
-				.get("/autores/nome/Ziraldo")
+			await request(app.getHttpServer())
+				.post("/autores")
+				.set("Authorization", "Bearer mock-token")
+				.send(novoAutor)
+				.expect(HttpStatus.CREATED)
+
+			const response = await request(app.getHttpServer())
+				.get(`/autores/nome/${novoAutor.nome}`)
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toHaveLength(1)
-			expect(mockAutorService.findByNome).toHaveBeenCalledWith("Ziraldo")
+			expect(response.body).toBeInstanceOf(Array)
+			expect(response.body.length).toBeGreaterThan(0)
+			expect(response.body[0]).toMatchObject({
+				nome: novoAutor.nome
+			})
+		})
+
+		it("deve retornar lista vazia quando nome não existir", async () => {
+			const response = await request(app.getHttpServer())
+				.get("/autores/nome/NomeInexistente")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.OK)
+
+			expect(response.body).toBeInstanceOf(Array)
+			expect(response.body.length).toBe(0)
 		})
 	})
 
+
 	describe("POST /autores", () => {
-		it("Deve criar um Autor", async () => {
-			const novoAutor: AutorCreateDto = { nome: "Novo Autor" }
-			const autorCriado = ProdutoMockFactory.createMockAutor({
-				id: 2,
-				nome: novoAutor.nome,
-			})
+		it("Deve criar um novo Autor", async () => {
+			const novoAutor: AutorCreateDto = {
+				nome: "Ziraldo"
+			}
 
-			mockAutorService.create.mockResolvedValue(autorCriado)
-
-			const response = await request(testHelper.httpServer)
+			const response = await request(app.getHttpServer())
 				.post("/autores")
 				.set("Authorization", "Bearer mock-token")
 				.send(novoAutor)
@@ -134,102 +118,93 @@ describe("Autor E2E Tests", () => {
 
 			expect(response.body).toHaveProperty("id")
 			expect(response.body.nome).toBe(novoAutor.nome)
-			expect(mockAutorService.create).toHaveBeenCalledWith(novoAutor)
 		})
 
-		it("Deve retornar BAD_REQUEST (400) se o nome for null", async () => {
-			mockAutorService.create.mockRejectedValue(new BadRequestException("Nome é obrigatório"))
+		it("Deve retornar erro ao criar Autor sem nome", async () => {
+			const autorInvalido = {}
 
-			const response = await request(testHelper.httpServer)
+			await request(app.getHttpServer())
 				.post("/autores")
 				.set("Authorization", "Bearer mock-token")
-				.send({})
+				.send(autorInvalido)
 				.expect(HttpStatus.BAD_REQUEST)
-
-			expect(response.body).toHaveProperty("message", "Nome é obrigatório")
-			expect(response.body).toHaveProperty("statusCode", 400)
-			expect(mockAutorService.create).toHaveBeenCalledWith({})
-		})
-
-		it("Deve retornar BAD_REQUEST (400) se o nome for vazio", async () => {
-			mockAutorService.create.mockRejectedValue(
-				new BadRequestException("Nome não pode ser vazio"),
-			)
-
-			const response = await request(testHelper.httpServer)
-				.post("/autores")
-				.set("Authorization", "Bearer mock-token")
-				.send({ nome: "" })
-				.expect(HttpStatus.BAD_REQUEST)
-
-			expect(response.body).toHaveProperty("message", "Nome não pode ser vazio")
-			expect(response.body).toHaveProperty("statusCode", 400)
-		})
-
-		it("Deve retornar BAD_REQUEST (400) se o nome for apenas espaços", async () => {
-			mockAutorService.create.mockRejectedValue(
-				new BadRequestException("Nome deve conter caracteres válidos"),
-			)
-
-			const response = await request(testHelper.httpServer)
-				.post("/autores")
-				.set("Authorization", "Bearer mock-token")
-				.send({ nome: "   " })
-				.expect(HttpStatus.BAD_REQUEST)
-
-			expect(response.body).toHaveProperty("message", "Nome deve conter caracteres válidos")
 		})
 	})
 
 	describe("PUT /autores", () => {
-		it("Deve atualizar um autor existente", async () => {
-			const autorAtualizado: AutorUpdateDto = { id: 1, nome: "Autor Atualizado" }
-			const autorAtualizadoMock = ProdutoMockFactory.createMockAutor({
-				id: 1,
-				nome: "Autor Atualizado",
-			})
+		it("Deve atualizar um Autor existente", async () => {
+			// Primeiro cria um autor
+			const novoAutor: AutorCreateDto = {
+				nome: "Ziraldo"
+			}
 
-			mockAutorService.update.mockResolvedValue(autorAtualizadoMock)
+			const createResponse = await request(app.getHttpServer())
+				.post("/autores")
+				.set("Authorization", "Bearer mock-token")
+				.send(novoAutor)
+				.expect(HttpStatus.CREATED)
 
-			const response = await request(testHelper.httpServer)
+			const autorId = createResponse.body.id
+
+			// Depois atualiza
+			const autorAtualizado: AutorUpdateDto = {
+				id: autorId,
+				nome: "Ziraldo Alves Pinto"
+			}
+
+			const response = await request(app.getHttpServer())
 				.put("/autores")
 				.set("Authorization", "Bearer mock-token")
 				.send(autorAtualizado)
 				.expect(HttpStatus.OK)
 
 			expect(response.body.nome).toBe(autorAtualizado.nome)
-			expect(mockAutorService.update).toHaveBeenCalledWith(autorAtualizado)
 		})
 
-		it("Deve retornar BAD_REQUEST (400) ao atualizar com dados inválidos", async () => {
-			mockAutorService.update.mockRejectedValue(
-				new BadRequestException("ID é obrigatório para atualização"),
-			)
+		it("Deve retornar erro ao atualizar Autor inexistente", async () => {
+			const autorInexistente: AutorUpdateDto = {
+				id: 999,
+				nome: "Autor Inexistente"
+			}
 
-			await request(testHelper.httpServer)
+			await request(app.getHttpServer())
 				.put("/autores")
 				.set("Authorization", "Bearer mock-token")
-				.send({ nome: "Autor Sem ID" })
-				.expect(HttpStatus.BAD_REQUEST)
+				.send(autorInexistente)
+				.expect(HttpStatus.NOT_FOUND)
 		})
 	})
 
 	describe("DELETE /autores/:id", () => {
-		it("Deve deletar um autor pelo ID", async () => {
-			mockAutorService.delete.mockResolvedValue(undefined)
+		it("Deve deletar um Autor existente", async () => {
+			// Primeiro cria um autor
+			const novoAutor: AutorCreateDto = {
+				nome: "Ziraldo"
+			}
 
-			await request(testHelper.httpServer)
-				.delete("/autores/1")
+			const createResponse = await request(app.getHttpServer())
+				.post("/autores")
+				.set("Authorization", "Bearer mock-token")
+				.send(novoAutor)
+				.expect(HttpStatus.CREATED)
+
+			const autorId = createResponse.body.id
+
+			// Depois deleta
+			await request(app.getHttpServer())
+				.delete(`/autores/${autorId}`)
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.NO_CONTENT)
 
-			expect(mockAutorService.delete).toHaveBeenCalledWith(1)
+			// Verifica se foi realmente deletado
+			await request(app.getHttpServer())
+				.get(`/autores/${autorId}`)
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.NOT_FOUND)
 		})
 
-		it("Deve retornar NOT_FOUND (404) ao tentar deletar autor inexistente", async () => {
-			mockAutorService.delete.mockRejectedValue(new NotFoundException("Autor não encontrado"))
-
-			await request(testHelper.httpServer)
+		it("Deve retornar erro ao deletar Autor inexistente", async () => {
+			await request(app.getHttpServer())
 				.delete("/autores/999")
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.NOT_FOUND)

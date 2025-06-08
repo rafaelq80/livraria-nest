@@ -35,7 +35,7 @@ export class CategoriaService {
 		return categoria
 	}
 
-	async findByTipo(tipo: string): Promise<Categoria[]> {
+	async findAllByTipo(tipo: string): Promise<Categoria[]> {
 		return await this.categoriaRepository.find({
 			where: {
 				tipo: ILike(`%${tipo.trim()}%`),
@@ -49,16 +49,34 @@ export class CategoriaService {
 		})
 	}
 
+	private async findByTipo(tipo: string): Promise<Categoria | null> {
+		return await this.categoriaRepository.findOne({
+			where: { tipo }
+		})
+	}
+
 	async create(categoria: Categoria): Promise<Categoria> {
-		if (!categoria) throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
+		if (!categoria?.tipo?.trim()) throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
+
+		const categoriaExistente = await this.findByTipo(categoria.tipo.trim())
+		
+		if (categoriaExistente) {
+			throw new BadRequestException(ErrorMessages.CATEGORIA.ALREADY_EXISTS)
+		}
 
 		return await this.categoriaRepository.save(categoria)
 	}
 
 	async update(categoria: Categoria): Promise<Categoria> {
-		if (!categoria?.id) throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
+		if (!categoria?.id || !categoria?.tipo?.trim()) throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
 
 		await this.findById(categoria.id)
+
+		const categoriaExistente = await this.findByTipo(categoria.tipo.trim())
+		
+		if (categoriaExistente && categoriaExistente.id !== categoria.id) {
+			throw new BadRequestException(ErrorMessages.CATEGORIA.ALREADY_EXISTS)
+		}
 
 		return await this.categoriaRepository.save(categoria)
 	}
@@ -69,4 +87,5 @@ export class CategoriaService {
 		await this.findById(id)
 		await this.categoriaRepository.delete(id)
 	}
+
 }

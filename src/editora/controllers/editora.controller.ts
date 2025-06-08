@@ -27,7 +27,7 @@ export class EditoraController{
     @Get('/nome/:nome')
     @HttpCode(HttpStatus.OK)
     findByNome(@Param('nome') nome: string): Promise<Editora[]>{
-        return this.editoraService.findByNome(nome);
+        return this.editoraService.findAllByNome(nome);
     }
 
     @Post() 

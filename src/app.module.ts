@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common"
-import { ConfigModule } from "@nestjs/config"
 import { TypeOrmModule } from "@nestjs/typeorm"
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from "./app.controller"
 import { AutorModule } from "./autor/autor.module"
 import { CategoriaModule } from "./categoria/categoria.module"
@@ -11,15 +12,19 @@ import { RoleModule } from "./role/role.module"
 import { SecurityModule } from "./security/security.module"
 import { SendmailModule } from "./sendmail/sendmail.module"
 import { UsuarioModule } from "./usuario/usuario.module"
+import { AppConfigModule } from "./config/config.module"
+import { JwtAuthGuard } from "./security/guards/jwt-auth.guard"
 
 @Module({
 	imports: [
-		ConfigModule.forRoot({
-			isGlobal: true,
-		}),
+		ThrottlerModule.forRoot([{
+			ttl: 60, // tempo em segundos
+			limit: 10, // número máximo de requisições
+		}]),
+		AppConfigModule,
 		TypeOrmModule.forRootAsync({
 			useClass: DevService,
-			imports: [ConfigModule],
+			imports: [AppConfigModule],
 		}),
 		ProdutoModule,
 		AutorModule,
@@ -31,6 +36,15 @@ import { UsuarioModule } from "./usuario/usuario.module"
 		SendmailModule,
 	],
 	controllers: [AppController],
-	providers: [],
+	providers: [
+		{
+			provide: APP_GUARD,
+			useClass: JwtAuthGuard
+		},
+		{
+			provide: APP_GUARD,
+			useClass: ThrottlerGuard
+		}
+	],
 })
 export class AppModule {}
