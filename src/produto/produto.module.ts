@@ -9,9 +9,15 @@ import { ProdutoService } from './services/produto.service';
 import { AutorModule } from '../autor/autor.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Produto]), AutorModule, CategoriaModule, EditoraModule, ImageKitModule],
+    imports: [
+        TypeOrmModule.forFeature([Produto]), 
+        AutorModule, 
+        CategoriaModule, 
+        EditoraModule, 
+        ImageKitModule
+    ],
     controllers: [ProdutoController],
     providers: [ProdutoService],
     exports: [TypeOrmModule]
 })
-export class ProdutoModule {};
+export class ProdutoModule {}

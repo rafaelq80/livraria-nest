@@ -1,24 +1,26 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import { DeleteResult, ILike, Repository } from "typeorm"
-import { ErrorMessages } from "../../common/constants/error-messages"
+import { ILike, Repository } from "typeorm"
 import { Editora } from "../entities/editora.entity"
+import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class EditoraService {
+	private readonly logger = new Logger(EditoraService.name)
+
 	constructor(
 		@InjectRepository(Editora)
-		private readonly editoraRepository: Repository<Editora>,
+		private readonly editoraRepository: Repository<Editora>
 	) {}
 
 	async findAll(): Promise<Editora[]> {
 		return await this.editoraRepository.find({
 			relations: {
-				produtos: true,
+				produtos: true
 			},
 			order: {
-				nome: 'ASC',
-			},
+				nome: "ASC"
+			}
 		})
 	}
 
@@ -27,7 +29,7 @@ export class EditoraService {
 
 		const editora = await this.editoraRepository.findOne({
 			where: { id },
-			relations: { produtos: true },
+			relations: { produtos: true }
 		})
 
 		if (!editora) throw new NotFoundException(ErrorMessages.EDITORA.NOT_FOUND)
@@ -37,55 +39,73 @@ export class EditoraService {
 
 	async findAllByNome(nome: string): Promise<Editora[]> {
 		return await this.editoraRepository.find({
-			where: {
-				nome: ILike(`%${nome.trim()}%`),
-			},
+			where: { nome: ILike(`%${nome.trim()}%`), },
 			relations: {
-				produtos: true,
-			},
-			order: {
-				nome: 'ASC',
-			},
+				produtos: true
+			}
 		})
 	}
 
-	private async findByNome(nome: string): Promise<Editora | null> {
+	async findByNome(nome: string): Promise<Editora | undefined> {
 		return await this.editoraRepository.findOne({
-			where: { nome }
+			where: { nome },
+			relations: { produtos: true }
 		})
 	}
 
 	async create(editora: Editora): Promise<Editora> {
-		if (!editora?.nome?.trim()) throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
+		if (!editora?.nome?.trim()) {
+			throw new BadRequestException(ErrorMessages.EDITORA.INVALID_DATA)
+		}
 
 		const editoraExistente = await this.findByNome(editora.nome.trim())
-
 		if (editoraExistente) {
 			throw new BadRequestException(ErrorMessages.EDITORA.ALREADY_EXISTS)
 		}
 
-		return await this.editoraRepository.save(editora)
+		const novaEditora = this.editoraRepository.create({
+			nome: editora.nome.trim()
+		})
+
+		try {
+			return await this.editoraRepository.save(novaEditora)
+		} catch (error) {
+			this.logger.error('Erro ao criar editora:', error)
+			throw error
+		}
 	}
 
 	async update(editora: Editora): Promise<Editora> {
-		if (!editora?.id || !editora?.nome?.trim()) throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
+		if (!editora?.id) {
+			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
+		}
 
-		await this.findById(editora.id)
-	
+		if (!editora?.nome?.trim()) {
+			throw new BadRequestException(ErrorMessages.EDITORA.INVALID_DATA)
+		}
+
+		const editoraAtual = await this.findById(editora.id)
+
 		const editoraExistente = await this.findByNome(editora.nome.trim())
-			
 		if (editoraExistente && editoraExistente.id !== editora.id) {
 			throw new BadRequestException(ErrorMessages.EDITORA.ALREADY_EXISTS)
 		}
 
-		return await this.editoraRepository.save(editora)
+		editoraAtual.nome = editora.nome.trim()
+
+		try {
+			return await this.editoraRepository.save(editoraAtual)
+		} catch (error) {
+			this.logger.error('Erro ao atualizar editora:', error)
+			throw error
+		}
 	}
 
-	async delete(id: number): Promise<DeleteResult> {
-		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
+	async delete(id: number): Promise<void> {
+		const result = await this.editoraRepository.delete(id)
 
-		await this.findById(id)
-
-		return await this.editoraRepository.delete(id)
+		if (result.affected === 0) {
+			throw new NotFoundException(ErrorMessages.EDITORA.NOT_FOUND)
+		}
 	}
 }

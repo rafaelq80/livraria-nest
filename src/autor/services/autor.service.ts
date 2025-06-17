@@ -1,26 +1,26 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import { DeleteResult, ILike, In, Repository } from "typeorm"
-import { ErrorMessages } from "../../common/constants/error-messages"
-import { Produto } from "../../produto/entities/produto.entity"
-import { HasId } from "../../types/hasid"
+import { ILike, Repository } from "typeorm"
 import { Autor } from "../entities/autor.entity"
+import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class AutorService {
+	private readonly logger = new Logger(AutorService.name)
+
 	constructor(
 		@InjectRepository(Autor)
-		private readonly autorRepository: Repository<Autor>,
+		private readonly autorRepository: Repository<Autor>
 	) {}
 
 	async findAll(): Promise<Autor[]> {
 		return await this.autorRepository.find({
 			relations: {
-				produtos: true,
+				produtos: true
 			},
 			order: {
-				nome: "ASC",
-			},
+				nome: "ASC"
+			}
 		})
 	}
 
@@ -29,7 +29,7 @@ export class AutorService {
 
 		const autor = await this.autorRepository.findOne({
 			where: { id },
-			relations: { produtos: true },
+			relations: { produtos: true }
 		})
 
 		if (!autor) throw new NotFoundException(ErrorMessages.AUTHOR.NOT_FOUND)
@@ -37,93 +37,76 @@ export class AutorService {
 		return autor
 	}
 
-	async findManyByIds(ids: number[]): Promise<Map<number, Autor>> {
-		if (!ids.length) return new Map()
-
-		const autores = await this.autorRepository.findBy({ id: In(ids) })
-
-		if (autores.length !== ids.length) {
-			const foundIds = autores.map((a) => a.id)
-			const missingIds = ids.filter((id) => !foundIds.includes(id))
-			throw new BadRequestException(`${ErrorMessages.AUTHOR.NOT_FOUND}: ${missingIds.join(", ")}`)
-		}
-
-		return new Map(autores.map((autor) => [autor.id, autor]))
-	}
-
 	async findAllByNome(nome: string): Promise<Autor[]> {
 		return await this.autorRepository.find({
-			where: {
-				nome: ILike(`%${nome.trim()}%`),
-			},
-			relations: { produtos: true },
-			order: { nome: "ASC" },
+			where: { nome: ILike(`%${nome.trim()}%`), },
+			relations: {
+				produtos: true
+			}
+		})
+	}
+	
+	async findByNome(nome: string): Promise<Autor | undefined> {
+		return await this.autorRepository.findOne({
+			where: { nome },
+			relations: { produtos: true }
 		})
 	}
 
 	async create(autor: Autor): Promise<Autor> {
-		if (!autor?.nome?.trim()) throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
+		if (!autor?.nome?.trim()) {
+			throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
+		}
 
-		return await this.autorRepository.save(autor)
+		const autorExistente = await this.findByNome(autor.nome.trim())
+		if (autorExistente) {
+			throw new BadRequestException(ErrorMessages.AUTHOR.ALREADY_EXISTS)
+		}
+
+		const novoAutor = this.autorRepository.create({
+			nome: autor.nome.trim()
+		})
+
+		try {
+			return await this.autorRepository.save(novoAutor)
+		} catch (error) {
+			this.logger.error('Erro ao criar autor:', error)
+			throw error
+		}
 	}
 
 	async update(autor: Autor): Promise<Autor> {
-		if (!autor?.id) throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
-
-		await this.findById(autor.id)
-
-		return await this.autorRepository.save(autor)
-	}
-
-	async delete(id: number): Promise<DeleteResult> {
-		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
-
-		await this.findById(id)
-
-		return await this.autorRepository.delete(id)
-	}
-
-	async processarAutores(produto: Produto): Promise<Autor[]> {
-		if (!produto.autores || produto.autores.length === 0) {
-			return []
+		if (!autor?.id) {
+			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 		}
 
-		const autorIds = this.extrairIdsValidos(produto.autores)
-		
-		if (autorIds.length === 0) {
-			throw new BadRequestException("Nenhum autor válido fornecido")
+		if (!autor?.nome?.trim()) {
+			throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
 		}
 
-		const autoresMap = await this.findManyByIds(autorIds)
-		return autorIds.map((id) => autoresMap.get(id))
-	}
+		const autorAtual = await this.findById(autor.id)
 
-	private extrairIdsValidos(autores: Autor[] | string | unknown[]): number[] {
-		let autoresData: unknown[] = []
-
-		if (Array.isArray(autores)) {
-			autoresData = autores
-		} else if (typeof autores === "string") {
-			try {
-				autoresData = JSON.parse(autores) as unknown[]
-			} catch {
-				throw new BadRequestException("Formato JSON inválido para autores")
-			}
-		} else {
-			throw new BadRequestException("Formato inválido para o campo autores")
+		const autorExistente = await this.findByNome(autor.nome.trim())
+		if (autorExistente && autorExistente.id !== autor.id) {
+			throw new BadRequestException(ErrorMessages.AUTHOR.ALREADY_EXISTS)
 		}
 
-		return autoresData
-			.map((item) => {
-				if (typeof item === "number") return item
-				
-				if (typeof item === "object" && item && "id" in item) {
-					const id = (item as HasId).id
-					return typeof id === "number" ? id : null
-				}
+		autorAtual.nome = autor.nome.trim()
 
-				return null
-			})
-			.filter((id): id is number => typeof id === "number" && id > 0)
+		try {
+			return await this.autorRepository.save(autorAtual)
+		} catch (error) {
+			this.logger.error('Erro ao atualizar autor:', error)
+			throw error
+		}
 	}
+
+	async delete(id: number): Promise<void> {
+		const result = await this.autorRepository.delete(id)
+
+		if (result.affected === 0) {
+			throw new NotFoundException(ErrorMessages.AUTHOR.NOT_FOUND)
+		}
+	}
+
 }

@@ -17,12 +17,12 @@
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger"
+import { plainToInstance } from "class-transformer"
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard"
 import { Usuario } from "../entities/usuario.entity"
 import { UsuarioService } from "../services/usuario.service"
-import { RoleService } from "./../../role/services/role.service"
-import { CriarUsuarioDto } from "../dto/criarusuario.dto"
-import { plainToInstance } from "class-transformer"
+import { CriarUsuarioDto } from "../dtos/criarusuario.dto"
+import { AtualizarUsuarioDto } from "../dtos/atualizarusuario.dto"
 
 @ApiTags("Usuário")
 @ApiBearerAuth()
@@ -30,7 +30,6 @@ import { plainToInstance } from "class-transformer"
 export class UsuarioController {
 	constructor(
 		private readonly usuarioService: UsuarioService,
-		private readonly roleService: RoleService,
 	) {}
 
 	@UseGuards(JwtAuthGuard)
@@ -51,7 +50,7 @@ export class UsuarioController {
 	@UseInterceptors(FileInterceptor("fotoFile"))
 	@HttpCode(HttpStatus.CREATED)
 	async create(
-		@Body()  usuarioDto: CriarUsuarioDto,
+		@Body() usuarioDto: CriarUsuarioDto,
 		@UploadedFile(
 			new ParseFilePipe({
 				validators: [
@@ -63,11 +62,8 @@ export class UsuarioController {
 		)
 		fotoFile?: Express.Multer.File,
 	): Promise<Usuario> {
-		
-		const usuario = plainToInstance(Usuario, usuarioDto)
-		const usuarioRoles = await this.roleService.processarRoles(usuario)
-
-		return await this.usuarioService.create(usuarioRoles, fotoFile)
+		const dto = plainToInstance(CriarUsuarioDto, usuarioDto);
+		return await this.usuarioService.create(dto, fotoFile);
 	}
 
 	@UseGuards(JwtAuthGuard)
@@ -75,7 +71,7 @@ export class UsuarioController {
 	@UseInterceptors(FileInterceptor("fotoFile"))
 	@HttpCode(HttpStatus.OK)
 	async update(
-		@Body() usuario: Usuario,
+		@Body() usuarioDto: AtualizarUsuarioDto,
 		@UploadedFile(
 			new ParseFilePipe({
 				validators: [
@@ -87,8 +83,7 @@ export class UsuarioController {
 		)
 		fotoFile?: Express.Multer.File,
 	): Promise<Usuario> {
-		const usuarioRoles = await this.roleService.processarRoles(usuario)
-
-		return await this.usuarioService.update(usuarioRoles, fotoFile)
+		const dto = plainToInstance(AtualizarUsuarioDto, usuarioDto);
+		return await this.usuarioService.update(dto, fotoFile)
 	}
 }

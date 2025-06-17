@@ -7,9 +7,15 @@ import { Bcrypt } from "../security/bcrypt/bcrypt"
 import { RoleModule } from "../role/role.module"
 import { SendmailModule } from "../sendmail/sendmail.module"
 import { ImageKitModule } from "../imagekit/imagekit.module"
+import { Role } from "../role/entities/role.entity"
 
 @Module({
-	imports: [TypeOrmModule.forFeature([Usuario]), RoleModule, SendmailModule, ImageKitModule],
+	imports: [
+		TypeOrmModule.forFeature([Usuario, Role]),
+		RoleModule,
+		SendmailModule,
+		ImageKitModule
+	],
 	providers: [UsuarioService, Bcrypt],
 	controllers: [UsuarioController],
 	exports: [UsuarioService],

@@ -1,12 +1,15 @@
 ﻿import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import { QueryRunner, Repository } from "typeorm"
+import { In, QueryRunner, Repository } from "typeorm"
+import { ErrorMessages } from "../../common/constants/error-messages"
 import { ImageKitService } from "../../imagekit/services/imagekit.service"
+import { Role } from "../../role/entities/role.entity"
 import { RoleService } from "../../role/services/role.service"
 import { Bcrypt } from "../../security/bcrypt/bcrypt"
 import { SendmailService } from "../../sendmail/services/sendmail.service"
+import { AtualizarUsuarioDto } from "../dtos/atualizarusuario.dto"
+import { CriarUsuarioDto } from "../dtos/criarusuario.dto"
 import { Usuario } from "../entities/usuario.entity"
-import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class UsuarioService {
@@ -15,16 +18,43 @@ export class UsuarioService {
 	constructor(
 		@InjectRepository(Usuario)
 		private readonly usuarioRepository: Repository<Usuario>,
+		@InjectRepository(Role)
+		private readonly roleRepository: Repository<Role>,
 		private readonly roleService: RoleService,
 		private readonly bcrypt: Bcrypt,
 		private readonly sendmailService: SendmailService,
 		private readonly imagekitService: ImageKitService,
 	) {}
 
-	async findByUsuario(usuario: string): Promise<Usuario | null> {
-		return this.usuarioRepository.findOne({
+	async findAll(): Promise<Usuario[]> {
+		return await this.usuarioRepository.find({
+			relations: {
+				roles: true
+			}
+		})
+	}
+
+	async findById(id: number): Promise<Usuario> {
+		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
+
+		const usuario = await this.usuarioRepository.findOne({
+			where: { id },
+			relations: {
+				roles: true
+			}
+		})
+
+		if (!usuario) throw new NotFoundException(ErrorMessages.USER.NOT_FOUND)
+
+		return usuario
+	}
+
+	async findByUsuario(usuario: string): Promise<Usuario | undefined> {
+		return await this.usuarioRepository.findOne({
 			where: { usuario },
-			relations: ["roles"],
+			relations: {
+				roles: true
+			}
 		})
 	}
 
@@ -35,37 +65,35 @@ export class UsuarioService {
 		})
 	}
 
-	async findAll(): Promise<Usuario[]> {
-		return await this.usuarioRepository.find({
-			relations: {
-				roles: true,
-			},
+	async create(usuarioDto: CriarUsuarioDto, fotoFile: Express.Multer.File): Promise<Usuario> {
+		this.logger.log('=== INICIANDO CRIAÇÃO DE USUÁRIO ===')
+		this.logger.log('DTO recebido: ' + JSON.stringify(usuarioDto, null, 2))
+		this.logger.log('Arquivo de foto: ' + (fotoFile ? JSON.stringify({
+			fieldname: fotoFile.fieldname,
+			originalname: fotoFile.originalname,
+			mimetype: fotoFile.mimetype,
+			size: fotoFile.size
+		}, null, 2) : 'null'))
+
+		await this.verificarUsuarioDuplicado(usuarioDto.usuario)
+
+		const { roles, ...usuarioData } = usuarioDto
+
+		const usuario = this.usuarioRepository.create({
+			...usuarioData,
+			senha: await this.bcrypt.criptografarSenha(usuarioData.senha),
+			foto: fotoFile?.filename
 		})
-	}
 
-	async findById(id: number): Promise<Usuario> {
-		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
-
-		const usuario = await this.usuarioRepository.findOne({
-			where: { id },
-			relations: ["roles"],
-		})
-
-		if (!usuario) throw new NotFoundException(ErrorMessages.USER.NOT_FOUND)
-
-		return usuario
-	}
-
-	async create(usuario: Usuario, fotoFile: Express.Multer.File): Promise<Usuario> {
-		await this.verificarUsuarioDuplicado(usuario.usuario)
-
-		usuario.senha = await this.bcrypt.criptografarSenha(usuario.senha)
-
-		// Buscar roles usando findManyByIds
-		if (usuario.roles && usuario.roles.length > 0) {
-			const roleIds = usuario.roles.map(r => r.id)
-			const rolesMap = await this.roleService.findManyByIds(roleIds)
-			usuario.roles = roleIds.map(id => rolesMap.get(id))
+		// Validar e associar roles se fornecidos
+		if (roles && roles.length > 0) {
+			const rolesEncontradas = await this.roleRepository.findBy({
+				id: In(roles.map(r => r.id))
+			})
+			if (rolesEncontradas.length !== roles.length) {
+				throw new BadRequestException("Uma ou mais roles não foram encontradas")
+			}
+			usuario.roles = rolesEncontradas
 		}
 
 		const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
@@ -90,6 +118,7 @@ export class UsuarioService {
 					this.logger.warn(`Erro ao enviar email: ${error.message}`, error.stack)
 				})
 
+			this.logger.log('=== CRIAÇÃO DE USUÁRIO CONCLUÍDA ===')
 			return saveUsuario
 		} catch (error) {
 			await this.tratarErro(queryRunner, error)
@@ -98,31 +127,71 @@ export class UsuarioService {
 		}
 	}
 
-	async update(usuario: Usuario, fotoFile?: Express.Multer.File): Promise<Usuario> {
-		if (!usuario?.id) {
+	async update(usuarioDto: AtualizarUsuarioDto, fotoFile?: Express.Multer.File): Promise<Usuario> {
+		this.logger.log('=== INICIANDO ATUALIZAÇÃO DE USUÁRIO ===')
+		this.logger.log('DTO recebido: ' + JSON.stringify(usuarioDto, null, 2))
+		this.logger.log('Arquivo de foto: ' + (fotoFile ? JSON.stringify({
+			fieldname: fotoFile.fieldname,
+			originalname: fotoFile.originalname,
+			mimetype: fotoFile.mimetype,
+			size: fotoFile.size
+		}, null, 2) : 'null'))
+
+		if (!usuarioDto?.id) {
 			throw new BadRequestException("Usuário inválido!")
 		}
 
 		const queryRunner = this.usuarioRepository.manager.connection.createQueryRunner()
 
 		try {
-			const usuarioAtual = await this.findById(usuario.id)
+			const usuarioAtual = await this.findById(usuarioDto.id)
+			const { roles, ...usuarioData } = usuarioDto
 
-			await this.validarUsuarioExistente(usuario, usuarioAtual)
-			usuario.senha = await this.atualizarSenhaSeNecessario(usuario, usuarioAtual)
-			usuario.foto = await this.atualizarFotoSeNecessario(usuario, fotoFile, usuarioAtual)
+			// Atualiza os dados do usuário
+			Object.assign(usuarioAtual, usuarioData)
+
+			// Atualiza senha se fornecida
+			if (usuarioData.senha) {
+				usuarioAtual.senha = await this.bcrypt.criptografarSenha(usuarioData.senha)
+			}
+
+			// Atualiza foto se fornecida
+			if (fotoFile) {
+				const fotoUrl = await this.processarImagem(usuarioAtual, fotoFile)
+				if (fotoUrl) {
+					usuarioAtual.foto = fotoUrl
+				}
+			}
+
+			// Validar e atualizar roles se fornecidos
+			if (roles && roles.length > 0) {
+				const rolesEncontradas = await this.roleRepository.findBy({
+					id: In(roles.map(r => r.id))
+				})
+				if (rolesEncontradas.length !== roles.length) {
+					throw new BadRequestException("Uma ou mais roles não foram encontradas")
+				}
+				usuarioAtual.roles = rolesEncontradas
+			}
 
 			await queryRunner.connect()
 			await queryRunner.startTransaction()
 
-			const updateData = this.prepararDadosAtualizacao(usuario)
-			await queryRunner.manager.update(Usuario, usuario.id, updateData)
+			const updateData = this.prepararDadosAtualizacao(usuarioAtual)
+			await queryRunner.manager.update(Usuario, usuarioAtual.id, updateData)
 
-			await this.atualizarRolesSeNecessario(queryRunner, usuario)
+			if (roles) {
+				await queryRunner.manager
+					.createQueryBuilder()
+					.relation(Usuario, "roles")
+					.of(usuarioAtual)
+					.addAndRemove(roles, [])
+			}
 
 			await queryRunner.commitTransaction()
 
-			return this.findById(usuario.id)
+			this.logger.log('=== ATUALIZAÇÃO DE USUÁRIO CONCLUÍDA ===')
+			return this.findById(usuarioAtual.id)
 		} catch (error) {
 			await this.tratarErro(queryRunner, error)
 		} finally {
@@ -198,30 +267,19 @@ export class UsuarioService {
 		queryRunner: QueryRunner,
 		usuario: Usuario,
 	): Promise<void> {
-		if (usuario.roles !== undefined) {
-			const usuarioEntity = await queryRunner.manager.findOne(Usuario, {
-				where: { id: usuario.id },
-				relations: { roles: true },
-			})
-			if (usuarioEntity) {
-				usuarioEntity.roles = usuario.roles || []
-				await queryRunner.manager.save(Usuario, usuarioEntity)
-			}
+		if (usuario.roles) {
+			await queryRunner.manager
+				.createQueryBuilder()
+				.relation(Usuario, "roles")
+				.of(usuario)
+				.addAndRemove(usuario.roles, [])
 		}
 	}
 
 	private async tratarErro(queryRunner: QueryRunner, error: unknown): Promise<void> {
-		if (queryRunner.isTransactionActive) {
-			await queryRunner.rollbackTransaction()
-		}
-
-		this.logger.error(
-			`Erro ao atualizar usuario: ${(error as Error).message}`,
-			(error as Error).stack,
-		)
-		throw new BadRequestException(
-			`Erro ao atualizar usuario: ${(error as Error).message}`
-		)
+		await queryRunner.rollbackTransaction()
+		this.logger.error("Erro na operação:", error)
+		throw error
 	}
 
 	private async processarImagem(
@@ -235,9 +293,10 @@ export class UsuarioService {
 				file: foto,
 				recurso: "usuario",
 				identificador: usuario.id.toString(),
+				oldImageUrl: usuario.foto
 			})
 		} catch (error) {
-			this.logger.error(`Erro ao processar imagem: ${error.message}`, error.stack)
+			this.logger.error("Erro ao processar imagem:", error)
 			return null
 		}
 	}

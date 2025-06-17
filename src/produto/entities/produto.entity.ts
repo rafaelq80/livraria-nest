@@ -140,7 +140,20 @@ export class Produto {
   })
   @IsOptional()
   @IsNumber({ allowNaN: false, allowInfinity: false }, { message: 'Desconto deve ser um número' })
+  @Min(0, { message: 'Desconto não pode ser negativo' })
+  @Max(100, { message: 'Desconto não pode ser maior que 100' })
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true, default: 0 })
   desconto: number;
+
+  @ApiProperty({ 
+    description: 'Edição do Livro',
+    example: 1,
+    minimum: 1
+  })
+  @IsNotEmpty({ message: 'Número da Edição do livro é obrigatório' })
+  @Min(1, { message: 'Número da Edição do livro deve ser maior que zero' })
+  @Column({ type: 'int', nullable: false, default: 1 })
+  edicao?: number;
   
   // Campos de auditoria
   @ApiProperty({ description: 'Data de criação do registro' })
@@ -182,7 +195,6 @@ export class Produto {
   })
   @JoinColumn({ name: 'editora_id' })
   editora: Editora;
- 
 
   // Propriedades calculadas
   @ApiProperty({ description: 'Preço com desconto aplicado' })

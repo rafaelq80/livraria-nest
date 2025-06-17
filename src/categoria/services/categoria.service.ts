@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
 import { ILike, Repository } from "typeorm"
 import { Categoria } from "../entities/categoria.entity"
@@ -6,19 +6,21 @@ import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class CategoriaService {
+	private readonly logger = new Logger(CategoriaService.name)
+
 	constructor(
 		@InjectRepository(Categoria)
-		private readonly categoriaRepository: Repository<Categoria>,
+		private readonly categoriaRepository: Repository<Categoria>
 	) {}
 
 	async findAll(): Promise<Categoria[]> {
 		return await this.categoriaRepository.find({
 			relations: {
-				produtos: true,
+				produtos: true
 			},
 			order: {
-				tipo: "ASC",
-			},
+				tipo: "ASC"
+			}
 		})
 	}
 
@@ -27,7 +29,7 @@ export class CategoriaService {
 
 		const categoria = await this.categoriaRepository.findOne({
 			where: { id },
-			relations: { produtos: true },
+			relations: { produtos: true }
 		})
 
 		if (!categoria) throw new NotFoundException(ErrorMessages.CATEGORIA.NOT_FOUND)
@@ -37,55 +39,73 @@ export class CategoriaService {
 
 	async findAllByTipo(tipo: string): Promise<Categoria[]> {
 		return await this.categoriaRepository.find({
-			where: {
-				tipo: ILike(`%${tipo.trim()}%`),
-			},
+			where: { tipo: ILike(`%${tipo.trim()}%`), },
 			relations: {
-				produtos: true,
-			},
-			order: {
-				tipo: "ASC",
-			},
+				produtos: true
+			}
 		})
 	}
-
-	private async findByTipo(tipo: string): Promise<Categoria | null> {
+	
+	async findByTipo(tipo: string): Promise<Categoria | undefined> {
 		return await this.categoriaRepository.findOne({
-			where: { tipo }
+			where: { tipo },
+			relations: { produtos: true }
 		})
 	}
 
 	async create(categoria: Categoria): Promise<Categoria> {
-		if (!categoria?.tipo?.trim()) throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
+		if (!categoria?.tipo?.trim()) {
+			throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
+		}
 
 		const categoriaExistente = await this.findByTipo(categoria.tipo.trim())
-		
 		if (categoriaExistente) {
 			throw new BadRequestException(ErrorMessages.CATEGORIA.ALREADY_EXISTS)
 		}
 
-		return await this.categoriaRepository.save(categoria)
+		const novaCategoria = this.categoriaRepository.create({
+			tipo: categoria.tipo.trim()
+		})
+
+		try {
+			return await this.categoriaRepository.save(novaCategoria)
+		} catch (error) {
+			this.logger.error('Erro ao criar categoria:', error)
+			throw error
+		}
 	}
 
 	async update(categoria: Categoria): Promise<Categoria> {
-		if (!categoria?.id || !categoria?.tipo?.trim()) throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
+		if (!categoria?.id) {
+			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
+		}
 
-		await this.findById(categoria.id)
+		if (!categoria?.tipo?.trim()) {
+			throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
+		}
+
+		const categoriaAtual = await this.findById(categoria.id)
 
 		const categoriaExistente = await this.findByTipo(categoria.tipo.trim())
-		
 		if (categoriaExistente && categoriaExistente.id !== categoria.id) {
 			throw new BadRequestException(ErrorMessages.CATEGORIA.ALREADY_EXISTS)
 		}
 
-		return await this.categoriaRepository.save(categoria)
+		categoriaAtual.tipo = categoria.tipo.trim()
+
+		try {
+			return await this.categoriaRepository.save(categoriaAtual)
+		} catch (error) {
+			this.logger.error('Erro ao atualizar categoria:', error)
+			throw error
+		}
 	}
 
 	async delete(id: number): Promise<void> {
-		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
+		const result = await this.categoriaRepository.delete(id)
 
-		await this.findById(id)
-		await this.categoriaRepository.delete(id)
+		if (result.affected === 0) {
+			throw new NotFoundException(ErrorMessages.CATEGORIA.NOT_FOUND)
+		}
 	}
-
 }

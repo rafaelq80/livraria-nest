@@ -39,6 +39,12 @@ export class RoleController {
 		return this.roleService.findById(id)
 	}
 
+	@Get("/nome/:nome")
+	@HttpCode(HttpStatus.OK)
+	findAllByNome(@Param("nome") nome: string): Promise<Role[]> {
+		return this.roleService.findAllByNome(nome)
+	}
+
 	@Post()
 	@HttpCode(HttpStatus.CREATED)
 	create(@Body() role: Role): Promise<Role> {

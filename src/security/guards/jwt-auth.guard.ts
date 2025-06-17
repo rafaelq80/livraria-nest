@@ -12,7 +12,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       '/usuarios/cadastrar',
       '/usuarios/logar',
       '/usuarios/recuperarsenha',
-      '/usuarios/atualizarsenha'
+      '/usuarios/atualizarsenha',
+      '/produtos'
     ];
     
     const isPublic = publicRoutes.some(route => 

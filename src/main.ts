@@ -4,11 +4,10 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'debug', 'log', 'verbose'],
+  });
 
-  // Configurações de segurança
-  //app.use(helmet());
   app.enableCors({
     origin: process.env.FRONTEND_URL || '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
@@ -30,6 +29,5 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe());
 
   await app.listen(process.env.PORT ?? 4000);
-
 }
 bootstrap();

@@ -1,17 +1,7 @@
 import { IsString, IsEmail, MinLength, IsOptional, IsArray, ValidateNested, Matches, Length } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-
-class RoleIdDto {
-  @ApiProperty({ 
-    description: 'ID da role',
-    example: 1,
-    required: false
-  })
-  @IsOptional()
-  @Type(() => Number)
-  id: number;
-}
+import { Role } from '../../role/entities/role.entity';
 
 export class CriarUsuarioDto {
   @ApiProperty({ 
@@ -43,12 +33,12 @@ export class CriarUsuarioDto {
 
   @ApiProperty({ 
     description: 'Roles do usuário',
-    type: [RoleIdDto],
+    type: [Role],
     required: false
   })
   @IsOptional()
   @IsArray({ message: 'Roles deve ser um array' })
   @ValidateNested({ each: true })
-  @Type(() => RoleIdDto)
-  roles?: RoleIdDto[];
+  @Type(() => Role)
+  roles?: Role[];
 }

@@ -1,20 +1,27 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import { In, Repository } from "typeorm"
-import { ErrorMessages } from "../../common/constants/error-messages"
-import { HasId } from "../../types/hasid"
-import { Usuario } from "../../usuario/entities/usuario.entity"
+import { ILike, Repository } from "typeorm"
 import { Role } from "../entities/role.entity"
+import { ErrorMessages } from "../../common/constants/error-messages"
 
 @Injectable()
 export class RoleService {
+	private readonly logger = new Logger(RoleService.name)
+
 	constructor(
 		@InjectRepository(Role)
-		private readonly roleRepository: Repository<Role>,
+		private readonly roleRepository: Repository<Role>
 	) {}
 
 	async findAll(): Promise<Role[]> {
-		return this.roleRepository.find({ relations: { usuarios: true } })
+		return await this.roleRepository.find({
+			relations: {
+				usuarios: true
+			},
+			order: {
+				nome: "ASC"
+			}
+		})
 	}
 
 	async findById(id: number): Promise<Role> {
@@ -22,7 +29,7 @@ export class RoleService {
 
 		const role = await this.roleRepository.findOne({
 			where: { id },
-			relations: { usuarios: true },
+			relations: { usuarios: true }
 		})
 
 		if (!role) throw new NotFoundException(ErrorMessages.ROLE.NOT_FOUND)
@@ -30,103 +37,76 @@ export class RoleService {
 		return role
 	}
 
-	async findManyByIds(ids: number[]): Promise<Map<number, Role>> {
-		if (!ids.length) return new Map()
-
-		const roles = await this.roleRepository.findBy({ id: In(ids) })
-
-		if (roles.length !== ids.length) {
-			const foundIds = roles.map((a) => a.id)
-			const missingIds = ids.filter((id) => !foundIds.includes(id))
-			throw new BadRequestException(`${ErrorMessages.ROLE.NOT_FOUND}: ${missingIds.join(", ")}`)
-		}
-
-		return new Map(roles.map((autor) => [autor.id, autor]))
+	async findAllByNome(nome: string): Promise<Role[]> {
+		return await this.roleRepository.find({
+			where: { nome: ILike(`%${nome.trim()}%`), },
+			relations: {
+				usuarios: true
+			}
+		})
 	}
 
 	async findByNome(nome: string): Promise<Role | undefined> {
 		return await this.roleRepository.findOne({
 			where: { nome },
-			relations: {
-				usuarios: true,
-			},
+			relations: { usuarios: true }
 		})
 	}
 
 	async create(role: Role): Promise<Role> {
-		if (!role) throw new BadRequestException("Dados do role inválidos")
-		return this.roleRepository.save(role)
+		if (!role?.nome?.trim()) {
+			throw new BadRequestException(ErrorMessages.ROLE.INVALID_DATA)
+		}
+
+		const roleExistente = await this.findByNome(role.nome.trim())
+		if (roleExistente) {
+			throw new BadRequestException(ErrorMessages.ROLE.ALREADY_EXISTS)
+		}
+
+		const novaRole = this.roleRepository.create({
+			nome: role.nome.trim()
+		})
+
+		try {
+			return await this.roleRepository.save(novaRole)
+		} catch (error) {
+			this.logger.error('Erro ao criar role:', error)
+			throw error
+		}
 	}
 
 	async update(role: Role): Promise<Role> {
-		if (!role?.id) throw new BadRequestException("Dados do role inválidos")
-		await this.findById(role.id)
-		return this.roleRepository.save(role)
+		if (!role?.id) {
+			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
+		}
+
+		if (!role?.nome?.trim()) {
+			throw new BadRequestException(ErrorMessages.ROLE.INVALID_DATA)
+		}
+
+		const roleAtual = await this.findById(role.id)
+
+		const roleExistente = await this.findByNome(role.nome.trim())
+		if (roleExistente && roleExistente.id !== role.id) {
+			throw new BadRequestException(ErrorMessages.ROLE.ALREADY_EXISTS)
+		}
+
+		roleAtual.nome = role.nome.trim()
+
+		try {
+			return await this.roleRepository.save(roleAtual)
+		} catch (error) {
+			this.logger.error('Erro ao atualizar role:', error)
+			throw error
+		}
 	}
 
 	async delete(id: number): Promise<void> {
-		await this.findById(id)
-		await this.roleRepository.delete(id)
-	}
+		const result = await this.roleRepository.delete(id)
 
-	// Métodos Auxiliares
-
-	async processarRoles(usuario: Usuario): Promise<Usuario> {
-		// Caso rápido: sem roles
-		if (!usuario.roles) return { ...usuario, roles: [] }
-
-		try {
-			// Normalizar entrada para garantir um array
-			const rolesData = this.normalizarRolesInput(usuario.roles)
-
-			// Se vazio após normalização, retornar array vazio
-			if (!rolesData.length) return { ...usuario, roles: [] }
-
-			// Extrair IDs válidos
-			const roleIds = this.extrairIdsValidos(rolesData)
-
-			// Caso não existam IDs válidos
-			if (!roleIds.length) return { ...usuario, roles: [] }
-
-			// Buscar todos os roles de uma vez e mapear
-			const rolesMap = await this.findManyByIds(roleIds)
-			const roles = roleIds.map((id) => rolesMap.get(id))
-
-			return { ...usuario, roles }
-		} catch {
-			throw new BadRequestException(ErrorMessages.ROLE.INVALID_DATA)
+		if (result.affected === 0) {
+			throw new NotFoundException(ErrorMessages.ROLE.NOT_FOUND)
 		}
 	}
 
-	private normalizarRolesInput(roles: unknown): unknown[] {
-		if (Array.isArray(roles)) return roles
-
-		if (typeof roles === "string") {
-			try {
-				const parsed = JSON.parse(roles)
-				return Array.isArray(parsed) ? parsed : []
-			} catch {
-				return []
-			}
-		}
-
-		return []
-	}
-
-	private extrairIdsValidos(items: unknown[]): number[] {
-		return items
-			.map((item) => {
-				// Se for um número, retorna ele mesmo
-				if (typeof item === "number") return item
-
-				// Se for um objeto com id, retorna o id
-				if (typeof item === "object" && item && "id" in item) {
-					const id = (item as HasId).id
-					return typeof id === "number" ? id : null
-				}
-
-				return null
-			})
-			.filter((id): id is number => typeof id === "number" && id > 0)
-	}
 }

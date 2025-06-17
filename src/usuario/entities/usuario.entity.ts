@@ -45,7 +45,7 @@ export class Usuario {
 	@Transform(({ value }: TransformFnParams) => value?.trim())
 	@IsEmail({}, { message: 'Email inválido' })
 	@IsNotEmpty({ message: 'Email é obrigatório' })
-	@Column({ length: 255, nullable: false })
+	@Column({ length: 255, nullable: false, unique: true })
 	usuario: string
 
 	@ApiProperty({ 

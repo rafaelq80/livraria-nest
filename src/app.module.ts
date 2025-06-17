@@ -1,22 +1,25 @@
-import { Module } from "@nestjs/common"
-import { TypeOrmModule } from "@nestjs/typeorm"
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
+import { UsuarioModule } from './usuario/usuario.module';
+import { AutorModule } from './autor/autor.module';
+import { ProdutoModule } from './produto/produto.module';
 import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './security/guards/jwt-auth.guard';
+import { SecurityModule } from './security/security.module';
+import { CategoriaModule } from './categoria/categoria.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AppController } from "./app.controller"
-import { AutorModule } from "./autor/autor.module"
-import { CategoriaModule } from "./categoria/categoria.module"
 import { DevService } from "./data/services/dev.service"
 import { EditoraModule } from "./editora/editora.module"
-import { ProdutoModule } from "./produto/produto.module"
-import { RoleModule } from "./role/role.module"
-import { SecurityModule } from "./security/security.module"
 import { SendmailModule } from "./sendmail/sendmail.module"
-import { UsuarioModule } from "./usuario/usuario.module"
 import { AppConfigModule } from "./config/config.module"
-import { JwtAuthGuard } from "./security/guards/jwt-auth.guard"
 
 @Module({
 	imports: [
+		ConfigModule.forRoot({
+			isGlobal: true,
+		}),
 		ThrottlerModule.forRoot([{
 			ttl: 60, // tempo em segundos
 			limit: 10, // número máximo de requisições
@@ -32,7 +35,6 @@ import { JwtAuthGuard } from "./security/guards/jwt-auth.guard"
 		EditoraModule,
 		UsuarioModule,
 		SecurityModule,
-		RoleModule,
 		SendmailModule,
 	],
 	controllers: [AppController],
