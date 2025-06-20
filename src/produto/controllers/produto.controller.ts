@@ -21,12 +21,12 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express"
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags, ApiConsumes, ApiBody } from "@nestjs/swagger"
 import { plainToInstance } from "class-transformer"
-import { AutorService } from "../../autor/services/autor.service"
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard"
 import { CriarProdutoDto } from "../dtos/criarproduto.dto"
 import { Produto } from "../entities/produto.entity"
 import { ProdutoService } from "../services/produto.service"
 import { AtualizarProdutoDto } from "../dtos/atualizarproduto.dto"
+import { Public } from "../../security/decorators/public.decorator"
 
 @ApiTags("Produtos")
 @ApiBearerAuth()
@@ -36,10 +36,10 @@ export class ProdutoController {
 
 	constructor(
 		private readonly produtoService: ProdutoService,
-		private readonly autorService: AutorService,
 	) {}
 
 
+	@Public()
 	@Get()
 	@ApiOperation({ summary: 'Listar todos os produtos' })
 	@ApiResponse({ status: 200, description: 'Lista de produtos retornada com sucesso', type: [Produto] })

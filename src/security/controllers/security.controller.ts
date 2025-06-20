@@ -1,5 +1,4 @@
 ﻿import {
-	BadRequestException,
 	Body,
 	Controller,
 	HttpCode,
@@ -9,15 +8,15 @@
 	UseGuards
 } from "@nestjs/common"
 import { ApiTags } from "@nestjs/swagger"
+import { ErrorMessages } from "../../common/constants/error-messages"
+import { Usuario } from "../../usuario/entities/usuario.entity"
 import { RecuperarSenhaDto } from "../dto/recuperarsenha.dto"
 import { SendmailDto } from "../dto/sendmail.dto"
 import { UsuarioLoginDto } from "../dto/usuariologin.dto"
 import { LocalAuthGuard } from "../guards/local-auth.guard"
-import { UsuarioAutenticado } from "../interfaces/usuarioautenticado.interface"
 import { RecuperarSenhaService } from "../services/recuperarsenha.service"
 import { SecurityService } from "../services/security.service"
-import { ErrorMessages } from "../../common/constants/error-messages"
-import { Usuario } from "../../usuario/entities/usuario.entity"
+import { Public } from '../decorators/public.decorator'
 
 @ApiTags("Usuário")
 @Controller("/usuarios")
@@ -27,40 +26,74 @@ export class SecurityController {
 		private readonly recuperarSenhaService: RecuperarSenhaService,
 	) {}
 
+	@Public()
 	@UseGuards(LocalAuthGuard)
 	@HttpCode(HttpStatus.OK)
 	@Post("/logar")
-	async login(@Body() usuarioLoginDto: UsuarioLoginDto): Promise<UsuarioAutenticado> {
-		const usuario = await this.securityService.validateUser(
-			usuarioLoginDto.usuario,
-			usuarioLoginDto.senha,
-		)
-		return this.securityService.login(usuario as Usuario)
+	async login(@Body() usuarioLoginDto: UsuarioLoginDto) {
+		try {
+			const usuario = await this.securityService.validateUser(
+				usuarioLoginDto.usuario,
+				usuarioLoginDto.senha,
+			)
+			const data = await this.securityService.login(usuario as Usuario)
+			return {
+				status: 'success',
+				message: 'Login realizado com sucesso.',
+				data
+			}
+		} catch (error) {
+			return {
+				status: 'error',
+				message: error?.message ?? ErrorMessages.AUTH.INVALID_CREDENTIALS,
+				data: null
+			}
+		}
 	}
 
+	@Public()
 	@Post("/recuperarsenha")
 	async requestRecovery(@Body() sendmailDto: SendmailDto) {
 		try {
 			await this.recuperarSenhaService.enviarEmail(sendmailDto)
 			return {
-				message:
-					"Se o e-mail existir em nossa base, um link de recuperação será enviado para o seu e-mail.",
+				status: 'success',
+				message: 'Se o e-mail existir em nossa base, um link de recuperação será enviado para o seu e-mail.',
+				data: null
 			}
-		} catch (error: unknown) {
-			console.error("Erro: ", error instanceof Error ? error.message : error)
+		} catch {
 			return {
-				message:
-					"Se o e-mail existir em nossa base, um link de recuperação será enviado para o seu e-mail.",
+				status: 'error',
+				message: ErrorMessages.EMAIL.SEND_ERROR,
+				data: null
 			}
 		}
 	}
 
+	@Public()
 	@Patch("/atualizarsenha")
 	async resetPassword(@Body() recuperarSenhaDto: RecuperarSenhaDto) {
 		if (recuperarSenhaDto.senha !== recuperarSenhaDto.confirmarSenha) {
-			throw new BadRequestException(ErrorMessages.EMAIL.PASSWORDS_DONT_MATCH)
+			return {
+				status: 'error',
+				message: ErrorMessages.EMAIL.PASSWORDS_DONT_MATCH,
+				data: null
+			}
 		}
 
-		return this.recuperarSenhaService.atualizarSenha(recuperarSenhaDto)
+		try {
+			const data = await this.recuperarSenhaService.atualizarSenha(recuperarSenhaDto)
+			return {
+				status: 'success',
+				message: 'Senha atualizada com sucesso.',
+				data
+			}
+		} catch (error) {
+			return {
+				status: 'error',
+				message: error?.message ?? ErrorMessages.GENERAL.OPERATION_FAILED,
+				data: null
+			}
+		}
 	}
 }

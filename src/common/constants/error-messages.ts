@@ -28,6 +28,13 @@ export const ErrorMessages = {
         PASSWORD_REQUIREMENTS: "A senha deve ter no mínimo 8 caracteres.",
         RECOVERY_LINK_EXPIRED: "O link de recuperação de senha expirou. Por favor, solicite um novo.",
         RECOVERY_LINK_INVALID: "Link de recuperação de senha inválido.",
+        EMAIL_REQUIRED: "E-mail é obrigatório.",
+        EMAIL_INVALID: "E-mail inválido.",
+        PASSWORD_REQUIRED: "Senha é obrigatória.",
+        PASSWORD_WEAK: "A senha deve ter no mínimo 8 caracteres, uma letra maiúscula, uma minúscula, um número e um caractere especial.",
+        USERNAME_REQUIRED: "Usuário é obrigatório.",
+        ROLES_INVALID: "Uma ou mais roles são inválidas.",
+        ROLES_NOT_FOUND: "Uma ou mais roles não foram encontradas.",
     },
 
     // Roles (Permissões)

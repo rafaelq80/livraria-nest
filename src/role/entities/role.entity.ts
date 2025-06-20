@@ -28,13 +28,9 @@ export class Role {
 	@Transform(({ value }: TransformFnParams) => value?.trim())
 	@IsNotEmpty({ message: 'Descrição da role é obrigatória' })
 	@IsString({ message: 'Descrição deve ser uma string' })
-	@Length(5, 255, { message: 'Descrição deve ter entre 5 e 255 caracteres' })
+	@Length(2, 255, { message: 'Descrição deve ter entre 2 e 255 caracteres' })
 	@Column({ length: 255, nullable: false })
 	descricao: string
-
-	@ApiProperty({ type: () => Usuario, isArray: true, description: 'Usuários com esta role' })
-	@ManyToMany(() => Usuario, (usuario) => usuario.roles)
-	usuarios: Usuario[]
 
 	// Campos de auditoria
 	@ApiProperty({ description: "Data de criação do registro" })
@@ -44,4 +40,10 @@ export class Role {
 	@ApiProperty({ description: "Data de última atualização do registro" })
 	@UpdateDateColumn({ name: "updated_at" })
 	updatedAt: Date
+
+	// Relacionamento
+	@ApiProperty({ type: () => Usuario, isArray: true, description: 'Usuários com esta role' })
+	@ManyToMany(() => Usuario, (usuario) => usuario.roles, { lazy: true })
+	usuarios: Usuario[]
+
 }

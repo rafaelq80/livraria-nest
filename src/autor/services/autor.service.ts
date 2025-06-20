@@ -45,7 +45,7 @@ export class AutorService {
 			}
 		})
 	}
-	
+
 	async findByNome(nome: string): Promise<Autor | undefined> {
 		return await this.autorRepository.findOne({
 			where: { nome },

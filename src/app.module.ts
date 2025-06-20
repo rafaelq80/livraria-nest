@@ -1,19 +1,19 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { UsuarioModule } from './usuario/usuario.module';
-import { AutorModule } from './autor/autor.module';
-import { ProdutoModule } from './produto/produto.module';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AppController } from "./app.controller";
+import { AutorModule } from './autor/autor.module';
+import { CategoriaModule } from './categoria/categoria.module';
+import { AppConfigModule } from "./config/config.module";
+import { ProdService } from './data/services/prod.service';
+import { EditoraModule } from "./editora/editora.module";
+import { ProdutoModule } from './produto/produto.module';
 import { JwtAuthGuard } from './security/guards/jwt-auth.guard';
 import { SecurityModule } from './security/security.module';
-import { CategoriaModule } from './categoria/categoria.module';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { AppController } from "./app.controller"
-import { DevService } from "./data/services/dev.service"
-import { EditoraModule } from "./editora/editora.module"
-import { SendmailModule } from "./sendmail/sendmail.module"
-import { AppConfigModule } from "./config/config.module"
+import { SendmailModule } from "./sendmail/sendmail.module";
+import { UsuarioModule } from './usuario/usuario.module';
 
 @Module({
 	imports: [
@@ -26,7 +26,7 @@ import { AppConfigModule } from "./config/config.module"
 		}]),
 		AppConfigModule,
 		TypeOrmModule.forRootAsync({
-			useClass: DevService,
+			useClass: ProdService,
 			imports: [AppConfigModule],
 		}),
 		ProdutoModule,

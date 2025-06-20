@@ -1,4 +1,4 @@
-﻿import { Transform, TransformFnParams } from "class-transformer"
+﻿import { Exclude, Transform, TransformFnParams } from "class-transformer"
 import { IsEmail, IsNotEmpty, MinLength, IsOptional, IsString, Length, Matches } from "class-validator"
 import {
 	Column,
@@ -14,6 +14,7 @@ import { ApiProperty } from "@nestjs/swagger"
 
 @Entity({ name: "tb_usuarios" })
 export class Usuario {
+	
 	@ApiProperty({ description: 'ID do usuário' })
 	@PrimaryGeneratedColumn()
 	id: number
@@ -22,6 +23,7 @@ export class Usuario {
 		description: 'ID do Google (para login com Google)',
 		required: false
 	})
+	@Exclude()
 	@IsOptional()
 	@IsString({ message: 'Google ID deve ser uma string' })
 	@Column({ nullable: true })
@@ -52,6 +54,7 @@ export class Usuario {
 		description: 'Senha do usuário',
 		example: 'Senha@123'
 	})
+	@Exclude()
 	@Transform(({ value }: TransformFnParams) => value?.trim())
 	@IsNotEmpty({ message: 'Senha é obrigatória' })
 	@MinLength(8, { message: 'Senha deve ter no mínimo 8 caracteres' })
@@ -74,7 +77,7 @@ export class Usuario {
 	foto?: string
 
 	@ApiProperty({ type: () => Role, isArray: true, description: 'Roles do usuário' })
-	@ManyToMany(() => Role, (role) => role.usuarios, { eager: false, cascade: true })
+	@ManyToMany(() => Role, (role) => role.usuarios)
 	@JoinTable({
 		name: "tb_usuarios_roles",
 		joinColumn: { name: "usuario_id", referencedColumnName: "id" },
