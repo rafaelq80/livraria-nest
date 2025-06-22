@@ -1,98 +1,158 @@
-import { BadRequestException, Injectable } from "@nestjs/common"
+import { BadRequestException, Injectable, Logger } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { HttpService } from "@nestjs/axios"
 import { lastValueFrom } from "rxjs"
 import { createCanvas, loadImage } from "canvas"
-import { ImagekitDto } from "../dto/imagekit.dto"
-import { ImagekitResponse } from "../types/imagekitresponse"
+import { ImagekitDto, ImagekitResponse, BaseImageUpload } from "../dto"
 import { ErrorMessages } from "../../common/constants/error-messages"
+import { ImageValidationService } from "./image-validation.service"
 
 @Injectable()
 export class ImageKitService {
-	private readonly MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
-	private readonly ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"]
+	private readonly logger = new Logger(ImageKitService.name)
 	private readonly imageKitUrl: string
 	private readonly imageKitPrivateKey: string
+	private readonly imageKitDeleteUrl: string
+	private readonly uploadTimeout: number
+	private readonly deleteTimeout: number
+	private readonly compressionQuality: number
 
 	constructor(
 		private readonly configService: ConfigService,
 		private readonly httpService: HttpService,
+		private readonly imageValidationService: ImageValidationService,
 	) {
-		this.imageKitUrl = this.configService.get<string>("IMAGEKIT_URL_ENDPOINT")
-		this.imageKitPrivateKey = this.configService.get<string>("IMAGEKIT_PRIVATE_KEY")
+		this.imageKitUrl = this.configService.get<string>("imagekit.urlEndpoint")
+		this.imageKitPrivateKey = this.configService.get<string>("imagekit.privateKey")
+		this.imageKitDeleteUrl = this.configService.get<string>("imagekit.urlDelete")
+		this.uploadTimeout = this.configService.get<number>("imagekit.uploadTimeout")
+		this.deleteTimeout = this.configService.get<number>("imagekit.deleteTimeout")
+		this.compressionQuality = this.configService.get<number>("imagekit.compressionQuality")
 		
+		// Validar configuração na inicialização
+		this.validateConfiguration()
+	}
+
+	private validateConfiguration(): void {
 		if (!this.imageKitUrl) {
-			throw new BadRequestException(ErrorMessages.IMAGE.INVALID_URL)
+			throw new Error("IMAGEKIT_URL_ENDPOINT não configurado")
 		}
 		if (!this.imageKitPrivateKey) {
-			throw new BadRequestException(ErrorMessages.IMAGE.INVALID_URL)
+			throw new Error("IMAGEKIT_PRIVATE_KEY não configurado")
+		}
+		if (!this.imageKitDeleteUrl) {
+			throw new Error("IMAGEKIT_URL_DELETE não configurado")
 		}
 	}
 
-	async handleImage(imagekitDto: ImagekitDto): Promise<string | undefined> {
-		// Validar se o DTO está correto
-		if (!imagekitDto) {
-			console.error("ImagekitDto é undefined ou null")
-			return undefined
-		}
-
-		if (!imagekitDto.file) {
-			console.log("Nenhum arquivo fornecido para upload")
-			return undefined
+	async handleImage(imagekitDto: ImagekitDto | BaseImageUpload): Promise<string | undefined> {
+		if (!imagekitDto?.file) {
+			this.logger.warn("Nenhum arquivo fornecido para upload", {
+				recurso: imagekitDto?.recurso,
+				identificador: imagekitDto?.identificador
+			});
+			return undefined;
 		}
 
 		try {
+			this.logger.log("Iniciando processamento de imagem", {
+				recurso: imagekitDto.recurso,
+				identificador: imagekitDto.identificador,
+				fileName: imagekitDto.file.originalname,
+				fileSize: imagekitDto.file.size,
+				hasOldImage: 'oldImageUrl' in imagekitDto && !!imagekitDto.oldImageUrl,
+			});
+
 			// Deletar imagem antiga se existir
-			if (imagekitDto.oldImageUrl) {
-				await this.deleteOldImage(imagekitDto.oldImageUrl)
+			if ('oldImageUrl' in imagekitDto && imagekitDto.oldImageUrl) {
+				this.logger.log("Deletando imagem antiga", { oldImageUrl: imagekitDto.oldImageUrl });
+				await this.deleteOldImage(imagekitDto.oldImageUrl);
 			}
 
-			const imageBuffer = await this.getImageBuffer(imagekitDto.file)
+			const imageBuffer = await this.getImageBuffer(imagekitDto.file);
 			if (!imageBuffer) {
-				console.error("Não foi possível obter o buffer da imagem")
-				return undefined
+				this.logger.error("Não foi possível obter o buffer da imagem", {
+					fileName: imagekitDto.file.originalname,
+					fileSize: imagekitDto.file.size,
+					mimeType: imagekitDto.file.mimetype
+				});
+				return undefined;
 			}
 
 			// Validar se recurso e identificador existem
 			if (!imagekitDto.recurso || !imagekitDto.identificador) {
-				console.error("Recurso ou identificador não fornecidos:", {
+				this.logger.error("Recurso ou identificador não fornecidos", {
 					recurso: imagekitDto.recurso,
-					identificador: imagekitDto.identificador
-				})
-				return undefined
+					identificador: imagekitDto.identificador,
+					fileName: imagekitDto.file.originalname
+				});
+				return undefined;
 			}
 
 			const file = this.createFileObject(
 				imageBuffer,
 				imagekitDto.recurso,
 				imagekitDto.identificador,
-			)
+			);
 
-			return await this.uploadImage(file, `uploads/livraria/${imagekitDto.recurso}`)
+			this.logger.log("Arquivo criado com sucesso", {
+				fileName: file.filename,
+				bufferSize: file.size,
+				folder: `uploads/livraria/${imagekitDto.recurso}`
+			});
+
+			const result = await this.uploadImage(file, `uploads/livraria/${imagekitDto.recurso}`);
+			
+			this.logger.log("Upload concluído com sucesso", {
+				url: result,
+				recurso: imagekitDto.recurso,
+				identificador: imagekitDto.identificador
+			});
+
+			return result;
 		} catch (error) {
-			console.error("Erro ao processar imagem:", error)
-			throw new BadRequestException(
-				"Erro interno ao processar imagem"
-			)
+			this.logger.error("Erro ao processar imagem", {
+				error: error instanceof Error ? error.message : String(error),
+				stack: error instanceof Error ? error.stack : undefined,
+				recurso: imagekitDto.recurso,
+				identificador: imagekitDto.identificador,
+				fileName: imagekitDto.file?.originalname
+			});
+			throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED);
 		}
 	}
 
 	private async deleteOldImage(oldImageUrl?: string): Promise<void> {
-		if (!oldImageUrl || typeof oldImageUrl !== 'string') return
+		if (!oldImageUrl || typeof oldImageUrl !== 'string') {
+			this.logger.debug("URL da imagem antiga inválida ou não fornecida", { oldImageUrl });
+			return;
+		}
 
 		try {
-			const imageName = oldImageUrl.split("/").pop()
+			this.logger.log("Iniciando deleção de imagem antiga", { oldImageUrl });
+			
+			const imageName = oldImageUrl.split("/").pop();
 			if (!imageName) {
-				console.warn("Não foi possível extrair o nome da imagem da URL:", oldImageUrl)
-				return
+				this.logger.warn("Não foi possível extrair o nome da imagem da URL", { oldImageUrl });
+				return;
 			}
 
-			const imageId = await this.getImageId(imageName)
+			this.logger.debug("Buscando ID da imagem para deleção", { imageName });
+			const imageId = await this.getImageId(imageName);
+			
 			if (imageId) {
-				await this.deleteImage(imageId)
+				this.logger.log("Deletando imagem antiga", { imageId, imageName });
+				await this.deleteImage(imageId);
+				this.logger.log("Imagem antiga deletada com sucesso", { imageId, imageName });
+			} else {
+				this.logger.warn("ID da imagem não encontrado, não foi possível deletar", { imageName, oldImageUrl });
 			}
 		} catch (error) {
-			console.error("Erro ao deletar imagem antiga:", error)
+			this.logger.error("Erro ao deletar imagem antiga", {
+				error: error instanceof Error ? error.message : String(error),
+				oldImageUrl,
+				imageName: oldImageUrl.split("/").pop()
+			});
 			// Não propagar o erro, pois a falha em deletar a imagem antiga não deve impedir o upload da nova
 		}
 	}
@@ -107,10 +167,10 @@ export class ImageKitService {
 				return image.buffer
 			}
 			
-			console.error("Formato de imagem inválido:", typeof image)
+			this.logger.error("Formato de imagem inválido:", typeof image)
 			return undefined
 		} catch (error) {
-			console.error("Erro ao obter buffer da imagem:", error)
+			this.logger.error("Erro ao obter buffer da imagem:", error)
 			return undefined
 		}
 	}
@@ -146,26 +206,19 @@ export class ImageKitService {
 			throw new BadRequestException(ErrorMessages.IMAGE.NOT_PROVIDED)
 		}
 
-		this.validateImage(image)
-		const processedBuffer = await this.processImage(image.buffer)
-		const form = this.createFormData(processedBuffer, image.originalname, folder)
-		return await this.postImage(form)
-	}
-
-	private validateImage(image: Express.Multer.File): void {
-		if (!image) {
-			throw new BadRequestException(ErrorMessages.IMAGE.NOT_PROVIDED)
-		}
-
-		if (!image.mimetype || !this.ALLOWED_TYPES.includes(image.mimetype)) {
+		// Validação robusta da imagem
+		const validationResult = await this.imageValidationService.validateImage(image)
+		if (!validationResult.isValid) {
 			throw new BadRequestException(
-				`${ErrorMessages.IMAGE.INVALID_FORMAT} Formatos permitidos: ${this.ALLOWED_TYPES.join(", ")}`
+				`Validação de imagem falhou: ${validationResult.errors.join(', ')}`
 			)
 		}
 
-		if (!image.size || image.size > this.MAX_FILE_SIZE) {
-			throw new BadRequestException(ErrorMessages.IMAGE.SIZE_EXCEEDED)
-		}
+		this.logger.log(`Imagem validada: ${validationResult.width}x${validationResult.height}, ${validationResult.fileSize} bytes`)
+
+		const processedBuffer = await this.processImage(image.buffer)
+		const form = this.createFormData(processedBuffer, image.originalname, folder)
+		return await this.postImage(form)
 	}
 
 	private createFormData(buffer: Buffer, filename: string, folder: string): FormData {
@@ -191,6 +244,7 @@ export class ImageKitService {
 			const response = await lastValueFrom(
 				this.httpService.post<ImagekitResponse>(this.imageKitUrl, form, {
 					headers: this.getAuthHeaders(),
+					timeout: this.uploadTimeout,
 				}),
 			)
 
@@ -198,48 +252,49 @@ export class ImageKitService {
 				throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
 			}
 
+			this.logger.log(`Upload realizado com sucesso: ${response.data.url}`)
 			return response.data.url
 		} catch (error) {
-			console.error("Erro ao fazer upload da imagem:", error)
+			this.logger.error("Erro ao fazer upload da imagem:", error)
 			throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
 		}
 	}
 
 	private async deleteImage(imageId: string): Promise<void> {
 		if (!imageId) {
-			console.warn("ID da imagem não fornecido para deleção")
+			this.logger.warn("ID da imagem não fornecido para deleção")
 			return
 		}
 
-		const deleteUrl = `${this.configService.get<string>("IMAGEKIT_URL_DELETE")}/${imageId}`
+		const deleteUrl = `${this.imageKitDeleteUrl}/${imageId}`
 
 		try {
 			const response = await lastValueFrom(
 				this.httpService.delete(deleteUrl, {
 					headers: this.getAuthHeaders(),
-					timeout: 10000, // 10 segundos de timeout
+					timeout: this.deleteTimeout,
 				}),
 			)
-			console.log("Imagem deletada com sucesso:", response.status, response.statusText)
+			this.logger.log("Imagem deletada com sucesso:", response.status, response.statusText)
 		} catch (error) {
-			console.error("Erro ao deletar arquivo:", error.response?.data ?? error.message)
+			this.logger.error("Erro ao deletar arquivo:", error.response?.data ?? error.message)
 			// Não propagar o erro para não interromper o fluxo principal
 		}
 	}
 
 	private async getImageId(imageName: string): Promise<string | null> {
 		if (!imageName) {
-			console.warn("Nome da imagem não fornecido")
+			this.logger.warn("Nome da imagem não fornecido")
 			return null
 		}
 
-		const url = `${this.configService.get<string>("IMAGEKIT_URL_DELETE")}?name=${encodeURIComponent(imageName)}`
+		const url = `${this.imageKitDeleteUrl}?name=${encodeURIComponent(imageName)}`
 
 		try {
 			const response = await lastValueFrom(
 				this.httpService.get<ImagekitResponse[]>(url, {
 					headers: this.getAuthHeaders(),
-					timeout: 10000, // 10 segundos de timeout
+					timeout: this.deleteTimeout,
 				}),
 			)
 
@@ -249,7 +304,7 @@ export class ImageKitService {
 
 			return null
 		} catch (error) {
-			console.error("Erro ao buscar ID da imagem:", error)
+			this.logger.error("Erro ao buscar ID da imagem:", error)
 			return null
 		}
 	}
@@ -264,9 +319,9 @@ export class ImageKitService {
 			const canvas = createCanvas(image.width, image.height)
 			const ctx = canvas.getContext("2d")
 			ctx.drawImage(image, 0, 0)
-			return canvas.toBuffer("image/jpeg", { quality: 0.8 })
+			return canvas.toBuffer("image/jpeg", { quality: this.compressionQuality })
 		} catch (error) {
-			console.error("Erro ao processar imagem:", error)
+			this.logger.error("Erro ao processar imagem:", error)
 			throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
 		}
 	}
@@ -280,7 +335,7 @@ export class ImageKitService {
 			const response = await lastValueFrom(
 				this.httpService.get(url, { 
 					responseType: "arraybuffer",
-					timeout: 30000, // 30 segundos de timeout
+					timeout: this.uploadTimeout,
 				}),
 			)
 
@@ -290,8 +345,19 @@ export class ImageKitService {
 
 			return Buffer.from(response.data)
 		} catch (error: unknown) {
-			const errorMessage = error instanceof Error ? error.message : String(error)
-			console.error("Erro ao baixar imagem:", errorMessage)
+			let errorMessage: string;
+			if (error instanceof Error) {
+				errorMessage = error.message;
+			} else if (typeof error === 'object' && error !== null) {
+				try {
+					errorMessage = JSON.stringify(error);
+				} catch {
+					errorMessage = '[Non-serializable error object]';
+				}
+			} else {
+				errorMessage = '[Unknown error type]';
+			}
+			this.logger.error("Erro ao baixar imagem:", errorMessage)
 			throw new BadRequestException(ErrorMessages.IMAGE.DOWNLOAD_ERROR)
 		}
 	}
@@ -307,6 +373,99 @@ export class ImageKitService {
 		return {
 			Authorization: `Basic ${encodedCredentials}`,
 			'Content-Type': 'multipart/form-data',
+		}
+	}
+
+	/**
+	 * Método utilitário para processar imagem de usuário
+	 */
+	async processarUsuarioImage(
+		userId: number,
+		file: Express.Multer.File,
+		oldImageUrl?: string
+	): Promise<string | undefined> {
+		return this.handleImage({
+			file,
+			recurso: "usuario",
+			identificador: userId.toString(),
+			oldImageUrl
+		})
+	}
+
+	/**
+	 * Método utilitário para processar imagem de produto
+	 */
+	async processarProdutoImage(
+		productId: number,
+		file: Express.Multer.File,
+		oldImageUrl?: string
+	): Promise<string | undefined> {
+		return this.handleImage({
+			file,
+			recurso: "produto",
+			identificador: productId.toString(),
+			oldImageUrl
+		})
+	}
+
+	/**
+	 * Método utilitário para processar imagem de autor
+	 */
+	async processarAutorImage(
+		authorId: number,
+		file: Express.Multer.File,
+		oldImageUrl?: string
+	): Promise<string | undefined> {
+		return this.handleImage({
+			file,
+			recurso: "autor",
+			identificador: authorId.toString(),
+			oldImageUrl
+		})
+	}
+
+	/**
+	 * Método utilitário para processar imagem de editora
+	 */
+	async processarEditoraImage(
+		publisherId: number,
+		file: Express.Multer.File,
+		oldImageUrl?: string
+	): Promise<string | undefined> {
+		return this.handleImage({
+			file,
+			recurso: "editora",
+			identificador: publisherId.toString(),
+			oldImageUrl
+		})
+	}
+
+	/**
+	 * Método para deletar imagem por URL
+	 */
+	async deleteImageByUrl(imageUrl: string): Promise<void> {
+		if (!imageUrl) return
+		await this.deleteOldImage(imageUrl)
+	}
+
+	/**
+	 * Método para validar se uma URL é do ImageKit
+	 */
+	isImageKitUrl(url: string): boolean {
+		return !!(url && typeof url === 'string' && url.includes('imagekit.io'))
+	}
+
+	/**
+	 * Obtém configuração atual do ImageKit
+	 */
+	getConfig() {
+		return {
+			urlEndpoint: this.imageKitUrl,
+			urlDelete: this.imageKitDeleteUrl,
+			uploadTimeout: this.uploadTimeout,
+			deleteTimeout: this.deleteTimeout,
+			compressionQuality: this.compressionQuality,
+			validation: this.imageValidationService.getConfig(),
 		}
 	}
 }

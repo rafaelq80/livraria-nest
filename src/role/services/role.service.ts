@@ -102,11 +102,11 @@ export class RoleService {
 	}
 
 	async delete(id: number): Promise<void> {
-		const result = await this.roleRepository.delete(id)
-
-		if (result.affected === 0) {
-			throw new NotFoundException(ErrorMessages.ROLE.NOT_FOUND)
+		const role = await this.findById(id)
+		if (role.usuarios && role.usuarios.length > 0) {
+			throw new BadRequestException(ErrorMessages.ROLE.CANNOT_DELETE_WITH_USERS)
 		}
+		await this.roleRepository.delete(id)
 	}
 
 }

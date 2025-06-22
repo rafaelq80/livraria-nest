@@ -2,31 +2,27 @@ import {
 	Body,
 	Controller,
 	Delete,
-	FileTypeValidator,
 	Get,
 	HttpCode,
 	HttpStatus,
 	Logger,
-	MaxFileSizeValidator,
 	Param,
-	ParseFilePipe,
 	ParseIntPipe,
 	Post,
 	Put,
-	Query,
-	UploadedFile,
 	UseGuards,
 	UseInterceptors
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags, ApiConsumes, ApiBody } from "@nestjs/swagger"
-import { plainToInstance } from "class-transformer"
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger"
+import { ValidatedImage } from "../../imagekit/decorators/image-validation.decorator"
+import { UseImageKit } from "../../imagekit/decorators/imagekit.decorator"
+import { Public } from "../../security/decorators/public.decorator"
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard"
+import { AtualizarProdutoDto } from "../dtos/atualizarproduto.dto"
 import { CriarProdutoDto } from "../dtos/criarproduto.dto"
 import { Produto } from "../entities/produto.entity"
 import { ProdutoService } from "../services/produto.service"
-import { AtualizarProdutoDto } from "../dtos/atualizarproduto.dto"
-import { Public } from "../../security/decorators/public.decorator"
 
 @ApiTags("Produtos")
 @ApiBearerAuth()
@@ -60,44 +56,25 @@ export class ProdutoController {
 	@ApiOperation({ summary: 'Buscar produtos por título' })
 	@ApiQuery({ name: 'titulo', description: 'Título do produto para busca', required: true })
 	@ApiResponse({ status: 200, description: 'Produtos encontrados com sucesso', type: [Produto] })
-	async findAllByTitulo(@Query('titulo') titulo: string): Promise<Produto[]> {
+	async findAllByTitulo(@Param('titulo') titulo: string): Promise<Produto[]> {
 		return await this.produtoService.findAllByTitulo(titulo)
 	}
 
 	@Post()
-	@UseInterceptors(FileInterceptor("fotoFile"))
+	@UseGuards(JwtAuthGuard)
 	@HttpCode(HttpStatus.CREATED)
 	@ApiOperation({ summary: 'Criar um novo produto' })
 	@ApiResponse({ status: 201, description: 'Produto criado com sucesso', type: Produto })
 	@ApiResponse({ status: 400, description: 'Dados inválidos' })
 	@ApiConsumes('multipart/form-data')
 	@ApiBody({ type: CriarProdutoDto })
+	@UseImageKit()
+	@UseInterceptors(FileInterceptor("fotoFile"))
 	async create(
 		@Body() produtoDto: CriarProdutoDto,
-		@UploadedFile(
-			new ParseFilePipe({
-				validators: [
-					new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
-					new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-				],
-				fileIsRequired: false
-			}),
-		)
-		fotoFile?: Express.Multer.File,
+		@ValidatedImage({ validateDimensions: true }) fotoFile?: Express.Multer.File,
 	): Promise<Produto> {
-		this.logger.log('=== DADOS RECEBIDOS NO CONTROLLER ===')
-		this.logger.log('DTO: ' + JSON.stringify(produtoDto, null, 2))
-		this.logger.log('Foto: ' + (fotoFile ? JSON.stringify({
-			fieldname: fotoFile.fieldname,
-			originalname: fotoFile.originalname,
-			mimetype: fotoFile.mimetype,
-			size: fotoFile.size
-		}, null, 2) : 'null'))
-		this.logger.log('================================')
-
-		const produto = plainToInstance(Produto, produtoDto);
-		this.logger.log('Produto após conversão: ' + JSON.stringify(produto, null, 2))
-		return await this.produtoService.create(produto, fotoFile);
+		return await this.produtoService.create(produtoDto, fotoFile);
 	}
 
 	@Put()
@@ -108,21 +85,22 @@ export class ProdutoController {
 	@ApiResponse({ status: 404, description: 'Produto não encontrado' })
 	@ApiConsumes('multipart/form-data')
 	@ApiBody({ type: AtualizarProdutoDto })
+	@UseImageKit()
 	@UseInterceptors(FileInterceptor('fotoFile'))
 	async update(
 		@Body() produtoDto: AtualizarProdutoDto,
-		@UploadedFile() fotoFile?: Express.Multer.File
+		@ValidatedImage({ validateDimensions: true }) fotoFile?: Express.Multer.File
 	): Promise<Produto> {
-		const produto = plainToInstance(Produto, produtoDto);
-		return await this.produtoService.update(produto, fotoFile)
+		return await this.produtoService.update(produtoDto, fotoFile)
 	}
 
 	@Delete("/:id")
 	@UseGuards(JwtAuthGuard)
 	@ApiOperation({ summary: 'Remover um produto' })
 	@ApiParam({ name: 'id', description: 'ID do produto', type: 'number' })
-	@ApiResponse({ status: 200, description: 'Produto removido com sucesso' })
+	@ApiResponse({ status: 204, description: 'Produto removido com sucesso' })
 	@ApiResponse({ status: 404, description: 'Produto não encontrado' })
+	@HttpCode(HttpStatus.NO_CONTENT)
 	async remove(@Param("id", ParseIntPipe) id: number): Promise<void> {
 		await this.produtoService.delete(id)
 	}

@@ -63,12 +63,8 @@ export class CategoriaService {
 			throw new BadRequestException(ErrorMessages.CATEGORIA.ALREADY_EXISTS)
 		}
 
-		const novaCategoria = this.categoriaRepository.create({
-			tipo: categoria.tipo.trim()
-		})
-
 		try {
-			return await this.categoriaRepository.save(novaCategoria)
+			return await this.categoriaRepository.save(categoria)
 		} catch (error) {
 			this.logger.error('Erro ao criar categoria:', error)
 			throw error
@@ -84,17 +80,17 @@ export class CategoriaService {
 			throw new BadRequestException(ErrorMessages.CATEGORIA.INVALID_DATA)
 		}
 
-		const categoriaAtual = await this.findById(categoria.id)
+		// Verificar se a categoria existe
+		await this.findById(categoria.id)
 
+		// Verificar se já existe outra categoria com o mesmo tipo
 		const categoriaExistente = await this.findByTipo(categoria.tipo.trim())
 		if (categoriaExistente && categoriaExistente.id !== categoria.id) {
 			throw new BadRequestException(ErrorMessages.CATEGORIA.ALREADY_EXISTS)
 		}
 
-		categoriaAtual.tipo = categoria.tipo.trim()
-
 		try {
-			return await this.categoriaRepository.save(categoriaAtual)
+			return await this.categoriaRepository.save(categoria)
 		} catch (error) {
 			this.logger.error('Erro ao atualizar categoria:', error)
 			throw error

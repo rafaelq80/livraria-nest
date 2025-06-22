@@ -23,10 +23,10 @@ import { GoogleController } from "./controllers/google.controller";
 		SendmailModule,
 		JwtModule.registerAsync({
 			imports: [ConfigModule],
-			useFactory: async (configService: ConfigService) => ({
-				secret: configService.get<string>("JWT_SECRET"),
+			useFactory: (configService: ConfigService) => ({
+				secret: configService.get<string>("jwt.secret"),
 				signOptions: {
-					expiresIn: "1h",
+					expiresIn: configService.get<string>("jwt.expiration") || "1h",
 				},
 			}),
 			inject: [ConfigService],

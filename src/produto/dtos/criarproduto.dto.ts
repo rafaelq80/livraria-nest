@@ -1,9 +1,9 @@
 import { ApiProperty } from "@nestjs/swagger"
 import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Length, Max, Min } from "class-validator"
-import { IsISBN } from "../../util/validators/isisbn.validator"
 import { Autor } from "../../autor/entities/autor.entity"
 import { Categoria } from "../../categoria/entities/categoria.entity"
 import { Editora } from "../../editora/entities/editora.entity"
+import { IsISBN10, IsISBN13 } from "../validators/isisbn.validator"
 
 export class CriarProdutoDto {
 	@ApiProperty({
@@ -76,7 +76,7 @@ export class CriarProdutoDto {
 		required: false,
 	})
 	@IsOptional()
-	@IsISBN("10", { message: "ISBN-10 inválido" })
+	@IsISBN10({ message: "ISBN-10 inválido" })
 	isbn10?: string
 
 	@ApiProperty({
@@ -85,7 +85,7 @@ export class CriarProdutoDto {
 		required: false,
 	})
 	@IsOptional()
-	@IsISBN("13", { message: "ISBN-13 inválido" })
+	@IsISBN13({ message: "ISBN-13 inválido" })
 	isbn13?: string
 
 	@ApiProperty({

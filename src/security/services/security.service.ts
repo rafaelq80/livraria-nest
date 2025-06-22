@@ -1,5 +1,6 @@
 ﻿import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common"
 import { JwtService } from "@nestjs/jwt"
+import { ConfigService } from "@nestjs/config"
 import { ErrorMessages } from "../../common/constants/error-messages"
 import { Usuario } from "../../usuario/entities/usuario.entity"
 import { UsuarioService } from "../../usuario/services/usuario.service"
@@ -13,6 +14,7 @@ export class SecurityService {
 		private readonly usuarioService: UsuarioService,
 		private readonly jwtService: JwtService,
 		private readonly bcrypt: Bcrypt,
+		private readonly configService: ConfigService,
 	) {}
 
 	async validateUser(usuario: string, senha: string): Promise<Omit<Usuario, 'senha'>> {
@@ -71,6 +73,9 @@ export class SecurityService {
 
 	gerarToken(usuario: string): string {
 		const payload: JwtPayload = { sub: usuario }
-		return `Bearer ${this.jwtService.sign(payload)}`
+		const tokenExpiration = this.configService.get<string>('jwt.expiration') || '1h'
+		const token = this.jwtService.sign(payload, { expiresIn: tokenExpiration })
+		return `Bearer ${token}`
 	}
+
 }

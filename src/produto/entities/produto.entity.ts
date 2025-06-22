@@ -25,7 +25,8 @@ import {
 import { Autor } from '../../autor/entities/autor.entity';
 import { Categoria } from '../../categoria/entities/categoria.entity';
 import { Editora } from '../../editora/entities/editora.entity';
-import { IsISBN } from '../../util/validators/isisbn.validator';
+import { IsISBN10, IsISBN13 } from '../validators/isisbn.validator';
+
 
 @Entity('tb_produtos')
 @Index('IDX_PRODUTO_TITULO', ['titulo']) // Índice para buscas por título
@@ -118,7 +119,7 @@ export class Produto {
     required: false
   })
   @IsOptional()
-  @IsISBN('10', { message: 'ISBN-10 inválido' })
+  @IsISBN10({ message: "ISBN-10 inválido" })
   @Column({ length: 17, nullable: true, unique: true })
   isbn10?: string;
 
@@ -128,7 +129,7 @@ export class Produto {
     required: false
   })
   @IsOptional()
-  @IsISBN('13', { message: 'ISBN-13 inválido' })
+  @IsISBN13({ message: "ISBN-13 inválido" })
   @Column({ length: 20, nullable: true, unique: true })
   isbn13?: string;
 

@@ -63,12 +63,8 @@ export class AutorService {
 			throw new BadRequestException(ErrorMessages.AUTHOR.ALREADY_EXISTS)
 		}
 
-		const novoAutor = this.autorRepository.create({
-			nome: autor.nome.trim()
-		})
-
 		try {
-			return await this.autorRepository.save(novoAutor)
+			return await this.autorRepository.save(autor)
 		} catch (error) {
 			this.logger.error('Erro ao criar autor:', error)
 			throw error
@@ -84,17 +80,17 @@ export class AutorService {
 			throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
 		}
 
-		const autorAtual = await this.findById(autor.id)
+		// Verificar se o autor existe
+		await this.findById(autor.id)
 
+		// Verificar se já existe outro autor com o mesmo nome
 		const autorExistente = await this.findByNome(autor.nome.trim())
 		if (autorExistente && autorExistente.id !== autor.id) {
 			throw new BadRequestException(ErrorMessages.AUTHOR.ALREADY_EXISTS)
 		}
 
-		autorAtual.nome = autor.nome.trim()
-
 		try {
-			return await this.autorRepository.save(autorAtual)
+			return await this.autorRepository.save(autor)
 		} catch (error) {
 			this.logger.error('Erro ao atualizar autor:', error)
 			throw error

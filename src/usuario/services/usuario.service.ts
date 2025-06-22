@@ -102,7 +102,10 @@ export class UsuarioService {
 
 		let usuarioPersistido = await this.usuarioRepository.save(usuario)
 		if (fotoFile) {
-			const fotoUrl = await this.processarImagem(usuarioPersistido, fotoFile)
+			const fotoUrl = await this.imagekitService.processarUsuarioImage(
+				usuarioPersistido.id,
+				fotoFile
+			)
 			if (fotoUrl) {
 				usuarioPersistido.foto = fotoUrl
 				usuarioPersistido = await this.usuarioRepository.save(usuarioPersistido)
@@ -110,7 +113,7 @@ export class UsuarioService {
 		}
 
 		await this.sendmailService
-			.sendmailConfirmacao(usuarioPersistido.nome, usuarioPersistido.usuario)
+			.sendmailConfirmacaoLegacy(usuarioPersistido.nome, usuarioPersistido.usuario)
 			.catch((error) => {
 				this.logger.warn(`Erro ao enviar email: ${error.message}`, error.stack)
 			})
@@ -142,33 +145,45 @@ export class UsuarioService {
 		)
 
 		if (!usuarioDto?.id) {
-			throw new BadRequestException("Usuário inválido!")
+			throw new BadRequestException(ErrorMessages.USER.INVALID_ID)
 		}
 
 		const usuarioAtual = await this.findById(usuarioDto.id)
 		const { roles, ...usuarioData } = usuarioDto
 
 		if (usuarioDto.usuario) {
-			usuarioDto.usuario = this.normalizarEmail(usuarioDto.usuario)
-			this.validarEmail(usuarioDto.usuario)
+			usuarioData.usuario = this.normalizarEmail(usuarioDto.usuario)
+			this.validarEmail(usuarioData.usuario)
 		}
-		if (usuarioDto.senha) this.validarSenha(usuarioDto.senha)
-
-		Object.assign(usuarioAtual, usuarioData)
 		if (usuarioDto.senha) {
-			usuarioAtual.senha = await this.bcrypt.criptografarSenha(usuarioDto.senha)
+			this.validarSenha(usuarioDto.senha)
+			usuarioData.senha = await this.bcrypt.criptografarSenha(usuarioDto.senha)
 		}
+
 		if (fotoFile) {
-			const fotoUrl = await this.processarImagem(usuarioAtual, fotoFile)
+			const fotoUrl = await this.imagekitService.processarUsuarioImage(
+				usuarioAtual.id,
+				fotoFile,
+				usuarioAtual.foto
+			)
 			if (fotoUrl) {
-				usuarioAtual.foto = fotoUrl
+				(usuarioData as Partial<Usuario>).foto = fotoUrl
 			}
 		}
-		if (roles !== undefined) {
-			usuarioAtual.roles = await this.obterRolesOuPadrao(roles)
+
+		// Atualizar dados básicos
+		if (Object.keys(usuarioData).length > 0) {
+			await this.usuarioRepository.update(usuarioDto.id, usuarioData)
 		}
 
-		const usuarioPersistido = await this.usuarioRepository.save(usuarioAtual)
+		// Atualizar roles se fornecidas
+		if (roles !== undefined) {
+			const rolesParaAssociar = await this.obterRolesOuPadrao(roles)
+			usuarioAtual.roles = rolesParaAssociar
+			await this.usuarioRepository.save(usuarioAtual)
+		}
+
+		const usuarioPersistido = await this.findById(usuarioDto.id)
 		this.logger.log("Usuario atualizado: " + JSON.stringify(usuarioPersistido, null, 2))
 
 		this.logger.log("=== ATUALIZAÇÃO DE USUÁRIO CONCLUÍDA ===")
@@ -214,40 +229,46 @@ export class UsuarioService {
 	}
 
 	private async obterRolesOuPadrao(
-		roles: { id: number }[] | Role[] | undefined,
+		roles: { id: number }[] | Role[] | string[] | string | undefined,
 	): Promise<Role[]> {
-		if (roles && roles.length > 0) {
+		// Se for string escapada, faz o parse
+		if (typeof roles === 'string') {
+			try {
+				roles = JSON.parse(roles);
+			} catch {
+				throw new BadRequestException(ErrorMessages.USER.ROLES_INVALID);
+			}
+		}
+		// Se for array, mas os itens são strings JSON, faz o parse de cada um
+		if (Array.isArray(roles)) {
+			roles = roles.map((r) => {
+				if (typeof r === 'string') {
+					try {
+						return JSON.parse(r);
+					} catch {
+						throw new BadRequestException(ErrorMessages.USER.ROLES_INVALID);
+					}
+				}
+				return r;
+			});
+		} else {
+			roles = [];
+		}
+
+		if (roles.length > 0) {
 			const ids = roles
 				.map((r) => Number((r as { id: number }).id))
-				.filter((id) => !isNaN(id) && id > 0)
+				.filter((id) => !isNaN(id) && id > 0);
 			if (ids.length !== roles.length)
-				throw new BadRequestException(ErrorMessages.USER.ROLES_INVALID)
-			const rolesEncontradas = await this.roleRepository.findBy({ id: In(ids) })
+				throw new BadRequestException(ErrorMessages.USER.ROLES_INVALID);
+			const rolesEncontradas = await this.roleRepository.findBy({ id: In(ids) });
 			if (rolesEncontradas.length !== roles.length)
-				throw new BadRequestException(ErrorMessages.USER.ROLES_NOT_FOUND)
-			return rolesEncontradas
+				throw new BadRequestException(ErrorMessages.USER.ROLES_NOT_FOUND);
+			return rolesEncontradas;
 		}
-		const defaultRole = await this.roleService.findByNome("user")
-		if (!defaultRole) throw new BadRequestException('Role padrão "user" não encontrada!')
-		return [defaultRole]
-	}
-
-	private async processarImagem(
-		usuario: Usuario,
-		foto: Express.Multer.File,
-	): Promise<string | null> {
-		if (!foto) return null
-
-		try {
-			return await this.imagekitService.handleImage({
-				file: foto,
-				recurso: "usuario",
-				identificador: usuario.id.toString(),
-				oldImageUrl: usuario.foto,
-			})
-		} catch (error) {
-			this.logger.error("Erro ao processar imagem:", error)
-			return null
-		}
+		const defaultRole = await this.roleService.findByNome("user");
+		if (!defaultRole) throw new BadRequestException(ErrorMessages.ROLE.NOT_FOUND);
+		return [defaultRole];
 	}
 }
+

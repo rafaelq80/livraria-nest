@@ -21,10 +21,11 @@ interface CreateProdutoDto {
 	idioma: string
 	isbn10: string
 	isbn13: string
-	categoria: Categoria
-	editora: Editora
-	autores: Autor[]
 	desconto?: number
+	edicao?: number
+	categoria: { id: number }
+	editora: { id: number }
+	autores: { id: number }[]
 }
 
 interface UpdateProdutoDto {
@@ -37,10 +38,11 @@ interface UpdateProdutoDto {
 	idioma: string
 	isbn10: string
 	isbn13: string
-	categoria: Categoria
-	editora: Editora
-	autores: Autor[]
 	desconto?: number
+	edicao?: number
+	categoria: { id: number }
+	editora: { id: number }
+	autores: { id: number }[]
 }
 
 describe("ProdutoController (e2e)", () => {
@@ -121,16 +123,18 @@ describe("ProdutoController (e2e)", () => {
 		it("deve retornar lista de produtos quando existirem produtos", async () => {
 			novoProduto = {
 				titulo: "JavaScript Descomplicado",
-				sinopse: "sinopse do livro",
+				sinopse: "Uma sinopse válida do livro para passar na validação.",
 				paginas: 250,
 				anoPublicacao: 2022,
 				preco: 88.96,
-				idioma: "Portugês",
+				idioma: "Português",
 				isbn10: gerarISBN10(),
 				isbn13: gerarISBN13(),
-				categoria: testCategoria,
-				editora: testEditora,
-				autores: [testAutor],
+				desconto: 0,
+				edicao: 1,
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			}
 
 			await request(app.getHttpServer())
@@ -153,16 +157,18 @@ describe("ProdutoController (e2e)", () => {
 		it("deve retornar produto quando ID existir", async () => {
 			novoProduto = {
 				titulo: "JavaScript Descomplicado",
-				sinopse: "sinopse do livro",
+				sinopse: "Uma sinopse válida do livro para passar na validação.",
 				paginas: 250,
 				anoPublicacao: 2022,
 				preco: 88.96,
-				idioma: "Portugês",
+				idioma: "Português",
 				isbn10: gerarISBN10(),
 				isbn13: gerarISBN13(),
-				categoria: testCategoria,
-				editora: testEditora,
-				autores: [testAutor],
+				desconto: 0,
+				edicao: 1,
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			}
 
 			const createResponse = await request(app.getHttpServer())
@@ -195,16 +201,18 @@ describe("ProdutoController (e2e)", () => {
 		it("deve retornar lista de produtos quando título existir", async () => {
 			novoProduto = {
 				titulo: "JavaScript Descomplicado",
-				sinopse: "sinopse do livro",
+				sinopse: "Uma sinopse válida do livro para passar na validação.",
 				paginas: 250,
 				anoPublicacao: 2022,
 				preco: 88.96,
-				idioma: "Portugês",
+				idioma: "Português",
 				isbn10: gerarISBN10(),
 				isbn13: gerarISBN13(),
-				categoria: testCategoria,
-				editora: testEditora,
-				autores: [testAutor],
+				desconto: 0,
+				edicao: 1,
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			}
 
 			await request(app.getHttpServer())
@@ -241,16 +249,18 @@ describe("ProdutoController (e2e)", () => {
 		it("deve criar produto quando dados forem válidos", async () => {
 			novoProduto = {
 				titulo: "JavaScript Descomplicado",
-				sinopse: "sinopse do livro",
+				sinopse: "Uma sinopse válida do livro para passar na validação.",
 				paginas: 250,
 				anoPublicacao: 2022,
 				preco: 88.96,
-				idioma: "Portugês",
+				idioma: "Português",
 				isbn10: gerarISBN10(),
 				isbn13: gerarISBN13(),
-				categoria: testCategoria,
-				editora: testEditora,
-				autores: [testAutor],
+				desconto: 0,
+				edicao: 1,
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			}
 
 			const response = await request(app.getHttpServer())
@@ -273,6 +283,9 @@ describe("ProdutoController (e2e)", () => {
 				idioma: "Chinês",
 				isbn10: "123",
 				isbn13: "456",
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			}
 
 			await request(app.getHttpServer())
@@ -287,16 +300,18 @@ describe("ProdutoController (e2e)", () => {
 		it("deve atualizar produto quando ID existir", async () => {
 			novoProduto = {
 				titulo: "JavaScript Descomplicado",
-				sinopse: "sinopse do livro",
+				sinopse: "Uma sinopse válida do livro para passar na validação.",
 				paginas: 250,
 				anoPublicacao: 2022,
 				preco: 88.96,
-				idioma: "Portugês",
+				idioma: "Português",
 				isbn10: gerarISBN10(),
 				isbn13: gerarISBN13(),
-				categoria: testCategoria,
-				editora: testEditora,
-				autores: [testAutor],
+				desconto: 0,
+				edicao: 1,
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			}
 
 			const createResponse = await request(app.getHttpServer())
@@ -329,16 +344,18 @@ describe("ProdutoController (e2e)", () => {
 			updateProduto = {
 				id: 999,
 				titulo: "JavaScript Descomplicado",
-				sinopse: "sinopse do livro",
+				sinopse: "Uma sinopse válida do livro para passar na validação.",
 				paginas: 250,
 				anoPublicacao: 2022,
 				preco: 88.96,
-				idioma: "Portugês",
+				idioma: "Português",
 				isbn10: gerarISBN10(),
 				isbn13: gerarISBN13(),
-				categoria: testCategoria,
-				editora: testEditora,
-				autores: [testAutor],
+				desconto: 0,
+				edicao: 1,
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			}
 
 			await request(app.getHttpServer())
@@ -351,16 +368,18 @@ describe("ProdutoController (e2e)", () => {
 		it("deve retornar 400 quando dados forem inválidos", async () => {
 			novoProduto = {
 				titulo: "JavaScript Descomplicado",
-				sinopse: "sinopse do livro",
+				sinopse: "Uma sinopse válida do livro para passar na validação.",
 				paginas: 250,
 				anoPublicacao: 2022,
 				preco: 88.96,
-				idioma: "Portugês",
+				idioma: "Português",
 				isbn10: gerarISBN10(),
 				isbn13: gerarISBN13(),
-				categoria: testCategoria,
-				editora: testEditora,
-				autores: [testAutor],
+				desconto: 0,
+				edicao: 1,
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			}
 
 			const response = await request(app.getHttpServer())
@@ -379,6 +398,9 @@ describe("ProdutoController (e2e)", () => {
 				idioma: "Chinês",
 				isbn10: "123",
 				isbn13: "456",
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			}
 
 			await request(app.getHttpServer())
@@ -392,24 +414,26 @@ describe("ProdutoController (e2e)", () => {
 	describe("DELETE /produtos/:id", () => {
 		it("deve remover produto quando ID existir", async () => {
 			novoProduto = {
-				titulo: "JavaScript Descomplicado",
+				titulo: "JavaScript muito Descomplicado",
 				sinopse: "sinopse do livro",
 				paginas: 250,
 				anoPublicacao: 2022,
 				preco: 88.96,
-				idioma: "Portugês",
+				idioma: "Português",
 				isbn10: gerarISBN10(),
 				isbn13: gerarISBN13(),
-				categoria: testCategoria,
-				editora: testEditora,
-				autores: [testAutor],
+				edicao: 1,
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			}
 
 			const createResponse = await request(app.getHttpServer())
 				.post("/produtos")
 				.set("Authorization", "Bearer mock-token")
 				.send(novoProduto)
-				.expect(HttpStatus.CREATED)
+
+			expect(createResponse.status).toBe(HttpStatus.CREATED)
 
 			await request(app.getHttpServer())
 				.delete(`/produtos/${createResponse.body.id}`)

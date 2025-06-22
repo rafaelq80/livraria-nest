@@ -2,6 +2,7 @@
 import { ConfigService } from "@nestjs/config"
 import { PassportStrategy } from "@nestjs/passport"
 import { ExtractJwt, Strategy } from "passport-jwt"
+import { Algorithm } from "jsonwebtoken"
 import { UsuarioService } from "../../usuario/services/usuario.service"
 import { JwtPayload } from "../interfaces/jwtpayload.interface"
 import { ErrorMessages } from "../../common/constants/error-messages"
@@ -12,13 +13,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 		private readonly configService: ConfigService,
 		private readonly usuarioService: UsuarioService,
 	) {
-		const jwtSecret = configService.getOrThrow<string>("JWT_SECRET")
+		const jwtSecret = configService.getOrThrow<string>("jwt.secret")
+		const jwtAlgorithm = (configService.get<string>("jwt.algorithm") || "HS256") as Algorithm
 
 		super({
 			jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
 			ignoreExpiration: false,
 			secretOrKey: jwtSecret,
-			algorithms: ["HS256"],
+			algorithms: [jwtAlgorithm],
 		})
 	}
 

@@ -1,22 +1,43 @@
-import { Injectable, Logger } from "@nestjs/common"
+import { Injectable, Logger, BadRequestException } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import * as nodemailer from 'nodemailer';
+import { SendMailDto, SendMailConfirmacaoDto, SendMailRecuperarSenhaDto, EmailTemplate } from '../dto/sendmail.dto';
+import { EMAIL_TEMPLATES, EMAIL_TEMPLATE_HTML } from '../templates/email-templates';
+import { ErrorMessages } from '../../common/constants/error-messages';
+
 
 @Injectable()
 export class SendmailService {
-	private readonly transporter: nodemailer.Transporter;
+	private transporter: nodemailer.Transporter;
 	private readonly logger = new Logger(SendmailService.name);
 
 	constructor(private readonly configService: ConfigService) {
+		this.validateConfiguration();
+		this.initializeTransporter();
+	}
+
+	private validateConfiguration(): void {
+		const mailConfig = this.configService.get('mail');
+		
+		if (!mailConfig?.auth?.user || !mailConfig?.auth?.pass) {
+			throw new Error('Configurações de email não encontradas. Verifique EMAIL_USER e EMAIL_PASSWORD.');
+		}
+
+		this.logger.log('✅ Configurações de email validadas com sucesso');
+	}
+
+	private initializeTransporter(): void {
+		const mailConfig = this.configService.get('mail');
+		
 		this.transporter = nodemailer.createTransport({
-			host: 'smtp.gmail.com',
-			port: 465,
-			secure: true,
-			auth: {
-				user: this.configService.get<string>("EMAIL_USER"),
-				pass: this.configService.get<string>("EMAIL_PASSWORD"),
-			},
-			tls: {
+			host: mailConfig.host,
+			port: mailConfig.port,
+			secure: mailConfig.secure,
+			auth: mailConfig.auth,
+			connectionTimeout: mailConfig.connectionTimeout ?? 60000,
+			greetingTimeout: mailConfig.greetingTimeout ?? 30000,
+			socketTimeout: mailConfig.socketTimeout ?? 60000,
+			tls: mailConfig.tls ?? {
 				rejectUnauthorized: false
 			}
 		});
@@ -29,6 +50,42 @@ export class SendmailService {
 				this.logger.log('📧 Serviço de email conectado com sucesso!');
 			}
 		});
+	}
+
+	private validateEmail(email: string): boolean {
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		return emailRegex.test(email);
+	}
+
+	private async delay(ms: number): Promise<void> {
+		return new Promise(resolve => setTimeout(resolve, ms));
+	}
+
+	private async sendMailWithRetry(mailOptions: nodemailer.SendMailOptions, maxRetries = 3): Promise<nodemailer.SentMessageInfo> {
+		const mailConfig = this.configService.get('mail');
+		const retries = mailConfig.maxRetries ?? maxRetries;
+		const retryDelay = mailConfig.retryDelay ?? 1000;
+
+		for (let attempt = 1; attempt <= retries; attempt++) {
+			try {
+				this.logger.log(`📧 Tentativa ${attempt}/${retries} de envio de email`);
+				return await this.transporter.sendMail(mailOptions);
+			} catch (error) {
+				this.logger.warn(`⚠️ Tentativa ${attempt} falhou: ${error.message}`);
+				
+				if (attempt === retries) {
+					this.logger.error(`❌ Todas as ${retries} tentativas falharam`);
+					throw error;
+				}
+				
+				// Exponential backoff
+				const delay = retryDelay * attempt;
+				this.logger.log(`⏳ Aguardando ${delay}ms antes da próxima tentativa...`);
+				await this.delay(delay);
+			}
+		}
+		
+		throw new Error('Erro inesperado no envio de email');
 	}
 
 	private async verificarEntrega(info: nodemailer.SentMessageInfo): Promise<boolean> {
@@ -58,66 +115,78 @@ export class SendmailService {
 		}
 	}
 
-	async sendmailConfirmacao(nome: string, usuario: string): Promise<void> {
-		try {
-			const info = await this.transporter.sendMail({
-				from: this.configService.get<string>("EMAIL_USER"),
-				to: usuario,
-				subject: "Confirmação de Cadastro",
-				html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Bem-vindo(a) ${nome}!</h2>
-          <p>Obrigado por se cadastrar em nossa plataforma.</p>
-          <p>Se você não se cadastrou em nossa plataforma, por favor ignore este e-mail.</p>
-          <p>Atenciosamente,<br/>Equipe de Suporte - Projeto Livraria</p>
-        </div>
-      `,
-			});
+	private async logMetrics(success: boolean, emailType: string, recipient: string): Promise<void> {
+		const status = success ? '✅ Sucesso' : '❌ Falha';
+		this.logger.log(`📊 Métrica: ${emailType} - ${status} - ${recipient}`);
+	}
 
+	async sendMail(sendMailDto: SendMailDto): Promise<void> {
+		// Validação
+		if (!this.validateEmail(sendMailDto.to)) {
+			throw new BadRequestException(ErrorMessages.EMAIL.INVALID_DESTINATION);
+		}
+
+		const templateConfig = EMAIL_TEMPLATES[sendMailDto.template];
+		if (!templateConfig) {
+			throw new BadRequestException(ErrorMessages.EMAIL.TEMPLATE_NOT_FOUND);
+		}
+
+		const mailConfig = this.configService.get('mail');
+		
+		try {
+			const mailOptions: nodemailer.SendMailOptions = {
+				from: mailConfig.from,
+				to: sendMailDto.to,
+				subject: sendMailDto.subject || templateConfig.subject,
+				html: EMAIL_TEMPLATE_HTML[templateConfig.template](sendMailDto.context || {})
+			};
+
+			this.logger.log(`📧 Iniciando envio de email: ${sendMailDto.template} para ${sendMailDto.to}`);
+
+			const info = await this.sendMailWithRetry(mailOptions);
 			const entregue = await this.verificarEntrega(info);
+			
+			await this.logMetrics(entregue, sendMailDto.template, sendMailDto.to);
+			
 			if (entregue) {
-				this.logger.log(`✅ E-mail de Confirmação de Cadastro enviado e entregue para ${usuario}`);
+				this.logger.log(`✅ Email ${sendMailDto.template} enviado e entregue para ${sendMailDto.to}`);
 			} else {
-				this.logger.warn(`⚠️ E-mail de Confirmação de Cadastro enviado mas não confirmado para ${usuario}`);
+				this.logger.warn(`⚠️ Email ${sendMailDto.template} enviado mas não confirmado para ${sendMailDto.to}`);
 			}
 		} catch (error) {
-			this.logger.error("❌ Erro ao enviar E-mail de Confirmação de Cadastro:", error);
+			await this.logMetrics(false, sendMailDto.template, sendMailDto.to);
+			this.logger.error(`❌ Erro ao enviar email ${sendMailDto.template}:`, error);
 			throw error;
 		}
 	}
 
-	async sendmailRecuperarSenha(nome: string, usuario: string, resetLink: string): Promise<void> {
-		try {
-			const info = await this.transporter.sendMail({
-				from: this.configService.get<string>("EMAIL_USER"),
-				to: usuario,
-				subject: "Recuperação de Senha",
-				html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1>Olá, ${nome}</h1>
-              <p>Recebemos uma solicitação para redefinir sua senha.</p>
-              <p>Clique no link abaixo para criar uma nova senha:</p>
-              <a href="${resetLink}">Redefinir minha senha</a>
-              <p>Se você não solicitou a redefinição de senha, ignore este e-mail.</p>
-              <p>Este link expira em 1 hora.</p>
-              <p>Atenciosamente,<br/>Equipe de Suporte - Projeto Livraria</p>
-            </div>
-            `,
-			});
+	async sendmailConfirmacao(dto: SendMailConfirmacaoDto): Promise<void> {
+		await this.sendMail({
+			to: dto.usuario,
+			subject: EMAIL_TEMPLATES[EmailTemplate.CONFIRMACAO_CADASTRO].subject,
+			template: EmailTemplate.CONFIRMACAO_CADASTRO,
+			context: { nome: dto.nome }
+		});
+	}
 
-			const entregue = await this.verificarEntrega(info);
-			if (entregue) {
-				this.logger.log(`✅ E-mail de Recuperação de Senha enviado e entregue para ${usuario}`);
-			} else {
-				this.logger.warn(`⚠️ E-mail de Recuperação de Senha enviado mas não confirmado para ${usuario}`);
-			}
-		} catch (error) {
-			this.logger.error("❌ Erro ao enviar o E-mail de Recuperação de Senha:", error);
-			throw error;
-		}
+	async sendmailRecuperarSenha(dto: SendMailRecuperarSenhaDto): Promise<void> {
+		await this.sendMail({
+			to: dto.usuario,
+			subject: EMAIL_TEMPLATES[EmailTemplate.RECUPERACAO_SENHA].subject,
+			template: EmailTemplate.RECUPERACAO_SENHA,
+			context: { nome: dto.nome, resetLink: dto.resetLink }
+		});
+	}
+
+	// Método para compatibilidade com código existente
+	async sendmailConfirmacaoLegacy(nome: string, usuario: string): Promise<void> {
+		await this.sendmailConfirmacao({ nome, usuario });
+	}
+
+	async sendmailRecuperarSenhaLegacy(nome: string, usuario: string, resetLink: string): Promise<void> {
+		await this.sendmailRecuperarSenha({ nome, usuario, resetLink });
 	}
 }
-
 
 /**
  * Para criar a senha de aplicativo do Gmail, utilize o link abaixo:

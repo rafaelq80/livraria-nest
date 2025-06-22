@@ -1,4 +1,5 @@
 ﻿import { Injectable, UnauthorizedException } from "@nestjs/common"
+import { ConfigService } from "@nestjs/config"
 import { PassportStrategy } from "@nestjs/passport"
 import { Strategy } from "passport-local"
 import { SecurityService } from "../services/security.service"
@@ -10,15 +11,15 @@ import { ErrorMessages } from "../../common/constants/error-messages"
 export class LocalStrategy extends PassportStrategy(Strategy) {
 	constructor(
 		private readonly securityService: SecurityService,
-		private readonly usuarioService: UsuarioService
+		private readonly usuarioService: UsuarioService,
+		private readonly configService: ConfigService
 	) {
-		const USUARIO = "usuario"
-		const SENHA = "senha"
+		const authConfig = configService.get('auth');
 		
 		super({
-			usernameField: USUARIO,
-			passwordField: SENHA,
-			session: false,
+			usernameField: authConfig.usernameField,
+			passwordField: authConfig.passwordField,
+			session: authConfig.sessionEnabled,
 		})
 	}
 

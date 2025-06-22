@@ -5,6 +5,7 @@ export const ErrorMessages = {
         MISSING_CREDENTIALS: "Credenciais ausentes. Por favor, forneça o usuário e senha.",
         UNAUTHORIZED: "Não autorizado.",
         USER_NOT_FOUND: "Usuário não encontrado.",
+        USER_NOT_AUTHENTICATED: "Usuário não autenticado.",
         INVALID_PASSWORD: "Senha incorreta.",
         INVALID_TOKEN: "Token de autenticação inválido ou expirado.",
         GOOGLE_AUTH_FAILED: "Falha na autenticação com Google.",
@@ -14,8 +15,10 @@ export const ErrorMessages = {
         GOOGLE_EMAIL_MISMATCH: "E-mail do token não corresponde ao e-mail do perfil.",
         GOOGLE_TOKEN_INVALID: "Token do Google inválido.",
         NO_ROLES: "Usuário sem permissões definidas.",
+        INSUFFICIENT_PERMISSIONS: "Permissões insuficientes para acessar este recurso.",
         INVALID_PAYLOAD: "Payload inválido.",
         CREDENTIALS_REQUIRED: "Usuário e senha são obrigatórios.",
+        TOO_MANY_ATTEMPTS: "Muitas tentativas. Tente novamente em 15 minutos.",
     },
 
     // Usuário
@@ -24,15 +27,11 @@ export const ErrorMessages = {
         ALREADY_EXISTS: "Usuário já existe.",
         INVALID_ID: "ID do usuário inválido.",
         INVALID_DATA: "Dados do usuário inválidos.",
-        PASSWORD_MISMATCH: "As senhas não coincidem.",
-        PASSWORD_REQUIREMENTS: "A senha deve ter no mínimo 8 caracteres.",
-        RECOVERY_LINK_EXPIRED: "O link de recuperação de senha expirou. Por favor, solicite um novo.",
-        RECOVERY_LINK_INVALID: "Link de recuperação de senha inválido.",
+        PASSWORD_MISMATCH: "A nova senha deve ser diferente da senha atual.",
         EMAIL_REQUIRED: "E-mail é obrigatório.",
         EMAIL_INVALID: "E-mail inválido.",
         PASSWORD_REQUIRED: "Senha é obrigatória.",
         PASSWORD_WEAK: "A senha deve ter no mínimo 8 caracteres, uma letra maiúscula, uma minúscula, um número e um caractere especial.",
-        USERNAME_REQUIRED: "Usuário é obrigatório.",
         ROLES_INVALID: "Uma ou mais roles são inválidas.",
         ROLES_NOT_FOUND: "Uma ou mais roles não foram encontradas.",
     },
@@ -43,7 +42,7 @@ export const ErrorMessages = {
         ALREADY_EXISTS: "Role já existe.",
         INVALID_ID: "ID da permissão inválido.",
         INVALID_DATA: "Dados da role inválidos.",
-        NOT_FOUND_MULTIPLE: "Algumas permissões não foram encontradas: ",
+        CANNOT_DELETE_WITH_USERS: "Não é possível remover uma role associada a usuários. Transfira ou remova os usuários antes.",
     },
 
     // Autor
@@ -52,7 +51,6 @@ export const ErrorMessages = {
         ALREADY_EXISTS: "Autor já existe.",
         INVALID_ID: "ID do autor inválido.",
         INVALID_DATA: "Dados do autor inválidos.",
-        NOT_FOUND_MULTIPLE: "Alguns autores não foram encontrados: ",
     },
 
     // Produto
@@ -85,16 +83,19 @@ export const ErrorMessages = {
         DOWNLOAD_ERROR: "Erro ao baixar a imagem.",
         UPLOAD_FAILED: "Falha ao fazer upload da imagem.",
         DELETE_FAILED: "Falha ao excluir a imagem.",
+        CONFIGURATION_ERROR: "Configuração do ImageKit inválida.",
+        NETWORK_ERROR: "Erro de conexão com o serviço de imagens.",
+        INVALID_FILE: "Arquivo de imagem inválido ou corrompido.",
+        FOLDER_ERROR: "Erro ao criar pasta no serviço de imagens.",
+        FILE_CORRUPTED: "Arquivo de imagem corrompido.",
     },
 
     // Geral
     GENERAL: {
-        INVALID_REQUEST: "Requisição inválida.",
-        SERVER_ERROR: "Erro interno do servidor. Por favor, tente novamente mais tarde.",
-        FORBIDDEN: "Você não tem permissão de acesso.",
         INVALID_ID: "Id inválido.",
         OPERATION_FAILED: "Operação falhou.",
         VALIDATION_FAILED: "Validação falhou.",
+        SERVER_ERROR: "Erro interno do servidor. Por favor, tente novamente mais tarde.",
     },
 
     // E-mail
@@ -103,5 +104,7 @@ export const ErrorMessages = {
         RECOVERY_LINK_EXPIRED: "O link de recuperação expirou.",
         RECOVERY_LINK_INVALID: "Link de recuperação inválido.",
         PASSWORDS_DONT_MATCH: "As senhas não coincidem.",
+        INVALID_DESTINATION: "Email de destino inválido.",
+        TEMPLATE_NOT_FOUND: "Template de email não encontrado.",
     },
 } as const; 

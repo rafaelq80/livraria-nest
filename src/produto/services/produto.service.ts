@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import { ILike, QueryRunner, Repository } from "typeorm"
+import { ILike, Repository, QueryFailedError } from "typeorm"
 import { AutorService } from "../../autor/services/autor.service"
 import { ErrorMessages } from "../../common/constants/error-messages"
 import { ImageKitService } from "../../imagekit/services/imagekit.service"
@@ -9,6 +9,9 @@ import { CriarProdutoDto } from "../dtos/criarproduto.dto"
 import { AtualizarProdutoDto } from "../dtos/atualizarproduto.dto"
 import { CategoriaService } from "../../categoria/services/categoria.service"
 import { EditoraService } from "../../editora/services/editora.service"
+import { Categoria } from "../../categoria/entities/categoria.entity"
+import { Autor } from "../../autor/entities/autor.entity"
+import { Editora } from "../../editora/entities/editora.entity"
 
 @Injectable()
 export class ProdutoService {
@@ -20,9 +23,8 @@ export class ProdutoService {
 		private readonly imageKitService: ImageKitService,
 		private readonly categoriaService: CategoriaService,
 		private readonly editoraService: EditoraService,
-		private readonly autorService: AutorService
+		private readonly autorService: AutorService,
 	) {}
-
 
 	async findAll(): Promise<Produto[]> {
 		return await this.produtoRepository.find({
@@ -46,7 +48,7 @@ export class ProdutoService {
 			},
 		})
 
-		if (!produto) throw new NotFoundException(ErrorMessages.USER.NOT_FOUND)
+		if (!produto) throw new NotFoundException(ErrorMessages.PRODUTO.NOT_FOUND)
 
 		return produto
 	}
@@ -62,201 +64,118 @@ export class ProdutoService {
 				autores: true,
 			},
 			order: {
-				titulo: 'ASC',
+				titulo: "ASC",
 			},
 		})
 	}
 
 	async create(produtoDto: CriarProdutoDto, fotoFile?: Express.Multer.File): Promise<Produto> {
-		this.logger.log('=== INICIANDO CRIAÇÃO DE PRODUTO ===')
-		this.logger.log('DTO recebido: ' + JSON.stringify(produtoDto, null, 2))
-		this.logger.log('Arquivo de foto: ' + (fotoFile ? JSON.stringify({
-			fieldname: fotoFile.fieldname,
-			originalname: fotoFile.originalname,
-			mimetype: fotoFile.mimetype,
-			size: fotoFile.size
-		}, null, 2) : 'null'))
+		await this.validateCategoria(produtoDto.categoria)
+		await this.validateEditora(produtoDto.editora)
+		await this.validateAutores(produtoDto.autores)
+		const produto = this.produtoRepository.create(produtoDto)
 
-		// Validar categoria e editora
-		await this.validarCategoriaEEditora(produtoDto.categoria.id, produtoDto.editora.id);
-
-		// Validar autores
-		for (const autor of produtoDto.autores) {
-			try {
-				await this.autorService.findById(autor.id);
-			} catch {
-				throw new BadRequestException(`Autor com ID ${autor.id} não encontrado`);
-			}
+		let savedProduto: Produto
+		try {
+			savedProduto = await this.produtoRepository.save(produto)
+		} catch (error) {
+			this.handleSaveError(error)
 		}
-
-		const produto = this.produtoRepository.create(produtoDto);
-		this.logger.log('Produto criado: ' + JSON.stringify(produto, null, 2))
 
 		if (fotoFile) {
-			this.logger.log('Iniciando upload da foto...')
-			const fotoUrl = await this.imageKitService.handleImage({
-				file: fotoFile,
-				recurso: "produto",
-				identificador: produto.id.toString()
-			});
-			this.logger.log('Upload concluído: ' + fotoUrl)
-			produto.foto = fotoUrl;
+			await this.processFotoFile(savedProduto, fotoFile)
 		}
 
-		const savedProduto = await this.produtoRepository.save(produto);
-		this.logger.log('Produto salvo: ' + JSON.stringify(savedProduto, null, 2))
-		this.logger.log('=== CRIAÇÃO DE PRODUTO CONCLUÍDA ===')
-		return savedProduto;
+		return savedProduto
 	}
 
-	async update(produtoDto: AtualizarProdutoDto, fotoFile?: Express.Multer.File): Promise<Produto> {
-		this.logger.log('=== INICIANDO ATUALIZAÇÃO DE PRODUTO ===')
-		this.logger.log('ID: ' + produtoDto.id)
-		this.logger.log('DTO recebido: ' + JSON.stringify(produtoDto, null, 2))
-		this.logger.log('Arquivo de foto: ' + (fotoFile ? JSON.stringify({
-			fieldname: fotoFile.fieldname,
-			originalname: fotoFile.originalname,
-			mimetype: fotoFile.mimetype,
-			size: fotoFile.size
-		}, null, 2) : 'null'))
+	async update(
+		produtoDto: AtualizarProdutoDto,
+		fotoFile?: Express.Multer.File,
+	): Promise<Produto> {
+		const produto = await this.findById(produtoDto.id)
 
-		const produto = await this.findById(produtoDto.id);
-		this.logger.log('Produto encontrado: ' + JSON.stringify(produto, null, 2))
-
-		// Validar categoria e editora se fornecidas
-		if (produtoDto.categoria?.id) {
-			await this.validarCategoriaEEditora(produtoDto.categoria.id, produto.editora.id);
-		}
-		if (produtoDto.editora?.id) {
-			await this.validarCategoriaEEditora(produto.categoria.id, produtoDto.editora.id);
-		}
-
-		// Validar autores se fornecidos
-		if (produtoDto.autores) {
-			for (const autor of produtoDto.autores) {
-				try {
-					await this.autorService.findById(autor.id);
-				} catch {
-					throw new BadRequestException(`Autor com ID ${autor.id} não encontrado`);
-				}
-			}
-		}
+		await this.validateCategoria(produtoDto.categoria)
+		await this.validateEditora(produtoDto.editora)
+		await this.validateAutores(produtoDto.autores)
 
 		if (fotoFile) {
-			this.logger.log('Iniciando upload da nova foto...')
-			const fotoUrl = await this.imageKitService.handleImage({
-				file: fotoFile,
-				recurso: "produto",
-				identificador: produto.id.toString(),
-				oldImageUrl: produto.foto
-			});
-			this.logger.log('Upload concluído: ' + fotoUrl)
-			produtoDto.foto = fotoUrl;
+			await this.processFotoFile(produto, fotoFile)
+			produtoDto.foto = produto.foto
 		}
 
-		Object.assign(produto, produtoDto);
-		this.logger.log('Produto atualizado: ' + JSON.stringify(produto, null, 2))
+		Object.assign(produto, produtoDto)
 
-		const updatedProduto = await this.produtoRepository.save(produto);
-		this.logger.log('Produto salvo: ' + JSON.stringify(updatedProduto, null, 2))
-		this.logger.log('=== ATUALIZAÇÃO DE PRODUTO CONCLUÍDA ===')
-		return updatedProduto;
+		let updatedProduto: Produto
+		try {
+			updatedProduto = await this.produtoRepository.save(produto)
+		} catch (error) {
+			this.handleSaveError(error)
+		}
+		return updatedProduto
 	}
 
 	async delete(id: number): Promise<void> {
 		const result = await this.produtoRepository.delete(id)
 
 		if (result.affected === 0) {
-			throw new NotFoundException(ErrorMessages.USER.NOT_FOUND)
+			throw new NotFoundException("Produto não encontrado.")
 		}
 	}
 
 	// Métodos Auxiliares
 
-	private async validarCategoriaEEditora(categoriaId: number, editoraId: number): Promise<void> {
-		try {
-			await this.categoriaService.findById(categoriaId);
-		} catch {
-			throw new BadRequestException(`Categoria com ID ${categoriaId} não encontrada`);
-		}
-
-		try {
-			await this.editoraService.findById(editoraId);
-		} catch {
-			throw new BadRequestException(`Editora com ID ${editoraId} não encontrada`);
+	private async validateCategoria(categoria: Categoria) {
+		if (categoria?.id) {
+			const found = await this.categoriaService.findById(categoria.id)
+			if (!found)
+				throw new BadRequestException(`${ErrorMessages.CATEGORIA.NOT_FOUND} (ID ${categoria.id})`)
 		}
 	}
 
-	private async atualizarFotoSeNecessario(
-		produto: Produto,
-		fotoFile: Express.Multer.File | undefined,
-		produtoAtual: Produto,
-	): Promise<string | undefined> {
-		const fotoUrl = await this.processarImagem(produto, fotoFile)
-		if (fotoUrl) return fotoUrl
-		return produto.foto ?? produtoAtual.foto
+	private async validateEditora(editora: Editora) {
+		if (editora?.id) {
+			const found = await this.editoraService.findById(editora.id)
+			if (!found) throw new BadRequestException(`${ErrorMessages.EDITORA.NOT_FOUND} (ID ${editora.id})`)
+		}
 	}
 
-	private prepararDadosAtualizacao(produto: Produto): Partial<Produto> {
-		const updateData: Partial<Produto> = {}
-		if (produto.titulo !== undefined) updateData.titulo = produto.titulo
-		if (produto.sinopse !== undefined) updateData.sinopse = produto.sinopse
-		if (produto.preco!== undefined) updateData.preco = produto.preco
-		if (produto.desconto!== undefined) updateData.desconto = produto.desconto
-		if (produto.isbn10!== undefined) updateData.isbn10 = produto.isbn10	
-		if (produto.isbn13!== undefined) updateData.isbn13 = produto.isbn13	
-		if (produto.paginas!== undefined) updateData.paginas = produto.paginas	
-		if (produto.anoPublicacao!== undefined) updateData.anoPublicacao = produto.anoPublicacao	
-		if (produto.edicao!== undefined) updateData.edicao = produto.edicao	
-		if (produto.idioma!== undefined) updateData.idioma = produto.idioma	
-		return updateData
-	}
-
-	private async atualizarAutoresSeNecessario(
-		queryRunner: QueryRunner,
-		produto: Produto,
-	): Promise<void> {
-		if (produto.autores !== undefined) {
-			const produtoEntity = await queryRunner.manager.findOne(Produto, {
-				where: { id: produto.id },
-				relations: { autores: true },
-			})
-			if (produtoEntity) {
-				produtoEntity.autores = produto.autores || []
-				await queryRunner.manager.save(Produto, produtoEntity)
+	private async validateAutores(autores: Autor[]) {
+		if (autores) {
+			for (const autor of autores) {
+				try {
+					await this.autorService.findById(autor.id)
+				} catch {
+					throw new BadRequestException(`${ErrorMessages.AUTHOR.NOT_FOUND} (ID ${autor.id})`)
+				}
 			}
 		}
 	}
 
-	private async tratarErro(queryRunner: QueryRunner, error: unknown): Promise<void> {
-		if (queryRunner.isTransactionActive) {
-			await queryRunner.rollbackTransaction()
+	private handleSaveError(error: unknown): never {
+		if (error instanceof QueryFailedError && typeof error.message === "string") {
+			const msg = error.message.toLowerCase()
+			if (msg.includes("unique") || msg.includes("constraint")) {
+				if (msg.includes("isbn13")) {
+					throw new BadRequestException(`${ErrorMessages.PRODUTO.ALREADY_EXISTS} (ISBN13)`)
+				}
+				if (msg.includes("isbn10")) {
+					throw new BadRequestException(`${ErrorMessages.PRODUTO.ALREADY_EXISTS} (ISBN10)`)
+				}
+			}
 		}
-
-		this.logger.error(
-			`Erro ao atualizar produto: ${(error as Error).message}`,
-			(error as Error).stack,
-		)
-		throw new BadRequestException(
-			`Erro ao atualizar produto: ${(error as Error).message}`
-		)
+		throw error
 	}
 
-	private async processarImagem(
-		produto: Produto,
-		foto: Express.Multer.File,
-	): Promise<string | null> {
-		if (!foto) return null
-
-		try {
-			return await this.imageKitService.handleImage({
-				file: foto,
-				recurso: "produto",
-				identificador: produto.id.toString(),
-			})
-		} catch (error) {
-			this.logger.error(`Erro ao processar imagem: ${error.message}`, error.stack)
-			return null
+	private async processFotoFile(produto: Produto, fotoFile: Express.Multer.File) {
+		const fotoUrl = await this.imageKitService.processarProdutoImage(
+			produto.id,
+			fotoFile,
+			produto.foto,
+		)
+		if (fotoUrl) {
+			produto.foto = fotoUrl
+			await this.produtoRepository.save(produto)
 		}
 	}
 }

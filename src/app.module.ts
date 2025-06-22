@@ -7,7 +7,7 @@ import { AppController } from "./app.controller";
 import { AutorModule } from './autor/autor.module';
 import { CategoriaModule } from './categoria/categoria.module';
 import { AppConfigModule } from "./config/config.module";
-import { ProdService } from './data/services/prod.service';
+import { DevService } from './data/services/dev.service';
 import { EditoraModule } from "./editora/editora.module";
 import { ProdutoModule } from './produto/produto.module';
 import { JwtAuthGuard } from './security/guards/jwt-auth.guard';
@@ -26,7 +26,7 @@ import { UsuarioModule } from './usuario/usuario.module';
 		}]),
 		AppConfigModule,
 		TypeOrmModule.forRootAsync({
-			useClass: ProdService,
+			useClass: DevService,
 			imports: [AppConfigModule],
 		}),
 		ProdutoModule,

@@ -63,12 +63,8 @@ export class EditoraService {
 			throw new BadRequestException(ErrorMessages.EDITORA.ALREADY_EXISTS)
 		}
 
-		const novaEditora = this.editoraRepository.create({
-			nome: editora.nome.trim()
-		})
-
 		try {
-			return await this.editoraRepository.save(novaEditora)
+			return await this.editoraRepository.save(editora)
 		} catch (error) {
 			this.logger.error('Erro ao criar editora:', error)
 			throw error
@@ -84,17 +80,17 @@ export class EditoraService {
 			throw new BadRequestException(ErrorMessages.EDITORA.INVALID_DATA)
 		}
 
-		const editoraAtual = await this.findById(editora.id)
+		// Verificar se a editora existe
+		await this.findById(editora.id)
 
+		// Verificar se já existe outra editora com o mesmo nome
 		const editoraExistente = await this.findByNome(editora.nome.trim())
 		if (editoraExistente && editoraExistente.id !== editora.id) {
 			throw new BadRequestException(ErrorMessages.EDITORA.ALREADY_EXISTS)
 		}
 
-		editoraAtual.nome = editora.nome.trim()
-
 		try {
-			return await this.editoraRepository.save(editoraAtual)
+			return await this.editoraRepository.save(editora)
 		} catch (error) {
 			this.logger.error('Erro ao atualizar editora:', error)
 			throw error

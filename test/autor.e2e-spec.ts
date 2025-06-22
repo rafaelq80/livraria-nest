@@ -5,11 +5,13 @@ import { TestDatabaseHelper } from "./helpers/test-database.helper"
 
 interface AutorCreateDto {
 	nome: string
+	nacionalidade?: string
 }
 
 interface AutorUpdateDto {
 	id: number
 	nome: string
+	nacionalidade?: string
 }
 
 describe("Autor E2E Tests", () => {
@@ -40,7 +42,8 @@ describe("Autor E2E Tests", () => {
 		it("deve retornar autor quando ID existir", async () => {
 			
 			const novoAutor: AutorCreateDto = {
-				nome: "Arlindo"
+				nome: "Arlindo",
+				nacionalidade: "Brasileira"
 			}
 
 			const createResponse = await request(app.getHttpServer())
@@ -71,7 +74,8 @@ describe("Autor E2E Tests", () => {
 	describe("GET /autores/nome/:nome", () => {
 		it("deve retornar lista de autores quando nome existir", async () => {
 			const novoAutor: AutorCreateDto = {
-				nome: "Zezinho"
+				nome: "Zezinho",
+				nacionalidade: "Brasileira"
 			}
 
 			await request(app.getHttpServer())
@@ -107,7 +111,8 @@ describe("Autor E2E Tests", () => {
 	describe("POST /autores", () => {
 		it("Deve criar um novo Autor", async () => {
 			const novoAutor: AutorCreateDto = {
-				nome: "Ziraldo"
+				nome: "Ziraldo",
+				nacionalidade: "Brasileira"
 			}
 
 			const response = await request(app.getHttpServer())
@@ -135,7 +140,8 @@ describe("Autor E2E Tests", () => {
 		it("Deve atualizar um Autor existente", async () => {
 			// Primeiro cria um autor
 			const novoAutor: AutorCreateDto = {
-				nome: "Ziraldo"
+				nome: "Reinaldo",
+				nacionalidade: "Brasileira"
 			}
 
 			const createResponse = await request(app.getHttpServer())
@@ -149,7 +155,8 @@ describe("Autor E2E Tests", () => {
 			// Depois atualiza
 			const autorAtualizado: AutorUpdateDto = {
 				id: autorId,
-				nome: "Ziraldo Alves Pinto"
+				nome: "Reinaldo Alves Pinto",
+				nacionalidade: "Brasileira"
 			}
 
 			const response = await request(app.getHttpServer())
@@ -179,7 +186,8 @@ describe("Autor E2E Tests", () => {
 		it("Deve deletar um Autor existente", async () => {
 			// Primeiro cria um autor
 			const novoAutor: AutorCreateDto = {
-				nome: "Ziraldo"
+				nome: "Geraldo",
+				nacionalidade: "Brasileira"
 			}
 
 			const createResponse = await request(app.getHttpServer())
