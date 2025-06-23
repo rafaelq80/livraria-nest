@@ -2,7 +2,9 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { Editora } from "../entities/editora.entity";
 import { EditoraService } from "../services/editora.service";
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard";
-import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
+import { CriarEditoraDto } from "../dtos/criareditora.dto";
+import { AtualizarEditoraDto } from "../dtos/atualizareditora.dto";
 
 @ApiTags('Editora')
 @ApiBearerAuth()
@@ -32,14 +34,16 @@ export class EditoraController{
 
     @Post() 
     @HttpCode(HttpStatus.CREATED)
-    create(@Body() editora: Editora): Promise<Editora> {
-        return this.editoraService.create(editora);
+    @ApiBody({ type: CriarEditoraDto })
+    create(@Body() editoraDto: CriarEditoraDto): Promise<Editora> {
+        return this.editoraService.create(editoraDto);
     }
 
     @Put() 
     @HttpCode(HttpStatus.OK)
-    update(@Body() editora: Editora): Promise<Editora> {
-        return this.editoraService.update(editora);
+    @ApiBody({ type: AtualizarEditoraDto })
+    update(@Body() editoraDto: AtualizarEditoraDto): Promise<Editora> {
+        return this.editoraService.update(editoraDto);
     }
 
     @Delete('/:id')

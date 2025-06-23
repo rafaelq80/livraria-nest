@@ -1,17 +1,14 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import { ILike, Repository, QueryFailedError } from "typeorm"
+import { ILike, QueryFailedError, Repository } from "typeorm"
 import { AutorService } from "../../autor/services/autor.service"
-import { ErrorMessages } from "../../common/constants/error-messages"
-import { ImageKitService } from "../../imagekit/services/imagekit.service"
-import { Produto } from "../entities/produto.entity"
-import { CriarProdutoDto } from "../dtos/criarproduto.dto"
-import { AtualizarProdutoDto } from "../dtos/atualizarproduto.dto"
 import { CategoriaService } from "../../categoria/services/categoria.service"
+import { ErrorMessages } from "../../common/constants/error-messages"
 import { EditoraService } from "../../editora/services/editora.service"
-import { Categoria } from "../../categoria/entities/categoria.entity"
-import { Autor } from "../../autor/entities/autor.entity"
-import { Editora } from "../../editora/entities/editora.entity"
+import { ImageKitService } from "../../imagekit/services/imagekit.service"
+import { AtualizarProdutoDto } from "../dtos/atualizarproduto.dto"
+import { AutorIdDto, CategoriaIdDto, CriarProdutoDto, EditoraIdDto } from "../dtos/criarproduto.dto"
+import { Produto } from "../entities/produto.entity"
 
 @Injectable()
 export class ProdutoService {
@@ -70,15 +67,18 @@ export class ProdutoService {
 	}
 
 	async create(produtoDto: CriarProdutoDto, fotoFile?: Express.Multer.File): Promise<Produto> {
+		
 		await this.validateCategoria(produtoDto.categoria)
 		await this.validateEditora(produtoDto.editora)
 		await this.validateAutores(produtoDto.autores)
+
 		const produto = this.produtoRepository.create(produtoDto)
 
 		let savedProduto: Produto
 		try {
 			savedProduto = await this.produtoRepository.save(produto)
 		} catch (error) {
+			this.logger.error(`[ProdutoService][create] ${ErrorMessages.PRODUTO.CREATE_FAILED} Dados: ${JSON.stringify(produtoDto)}. Erro: ${error instanceof Error ? error.message : error}`)
 			this.handleSaveError(error)
 		}
 
@@ -93,6 +93,7 @@ export class ProdutoService {
 		produtoDto: AtualizarProdutoDto,
 		fotoFile?: Express.Multer.File,
 	): Promise<Produto> {
+		
 		const produto = await this.findById(produtoDto.id)
 
 		await this.validateCategoria(produtoDto.categoria)
@@ -110,45 +111,52 @@ export class ProdutoService {
 		try {
 			updatedProduto = await this.produtoRepository.save(produto)
 		} catch (error) {
+			this.logger.error(`[ProdutoService][update] ${ErrorMessages.PRODUTO.UPDATE_FAILED} ID ${produtoDto.id}. Dados: ${JSON.stringify(produtoDto)}. Erro: ${error instanceof Error ? error.message : error}`)
 			this.handleSaveError(error)
 		}
 		return updatedProduto
 	}
 
 	async delete(id: number): Promise<void> {
-		const result = await this.produtoRepository.delete(id)
+		const resultado = await this.produtoRepository.delete(id)
 
-		if (result.affected === 0) {
-			throw new NotFoundException("Produto não encontrado.")
+		if (resultado.affected === 0) {
+			throw new NotFoundException(ErrorMessages.PRODUTO.NOT_FOUND)
 		}
 	}
 
 	// Métodos Auxiliares
 
-	private async validateCategoria(categoria: Categoria) {
-		if (categoria?.id) {
-			const found = await this.categoriaService.findById(categoria.id)
-			if (!found)
-				throw new BadRequestException(`${ErrorMessages.CATEGORIA.NOT_FOUND} (ID ${categoria.id})`)
+	private async validateCategoria(categoria: CategoriaIdDto) {
+		if (!categoria?.id) {
+			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 		}
+		const buscaCategoria = await this.categoriaService.findById(categoria.id)
+		if (!buscaCategoria)
+			throw new BadRequestException(`${ErrorMessages.CATEGORIA.NOT_FOUND} (ID ${categoria.id})`)
 	}
 
-	private async validateEditora(editora: Editora) {
-		if (editora?.id) {
-			const found = await this.editoraService.findById(editora.id)
-			if (!found) throw new BadRequestException(`${ErrorMessages.EDITORA.NOT_FOUND} (ID ${editora.id})`)
+	private async validateEditora(editora: EditoraIdDto) {
+		if (!editora?.id) {
+			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 		}
+		const buscaEditora = await this.editoraService.findById(editora.id)
+		if (!buscaEditora) throw new BadRequestException(`${ErrorMessages.EDITORA.NOT_FOUND} (ID ${editora.id})`)
 	}
 
-	private async validateAutores(autores: Autor[]) {
-		if (autores) {
-			for (const autor of autores) {
-				try {
-					await this.autorService.findById(autor.id)
-				} catch {
-					throw new BadRequestException(`${ErrorMessages.AUTHOR.NOT_FOUND} (ID ${autor.id})`)
-				}
-			}
+	private async validateAutores(autores: AutorIdDto[]) {
+		if (!autores || !Array.isArray(autores) || autores.length === 0) {
+			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_DATA)
+		}
+		const ids = autores.map(a => a.id)
+		if (ids.some(id => !id)) {
+			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
+		}
+		const encontrados = await this.autorService.findAllByIds(ids)
+		if (encontrados.length !== ids.length) {
+			const encontradosIds = new Set(encontrados.map(a => a.id))
+			const naoEncontrados = ids.filter(id => !encontradosIds.has(id))
+			throw new BadRequestException(`${ErrorMessages.AUTHOR.NOT_FOUND} (ID(s) ${naoEncontrados.join(', ')})`)
 		}
 	}
 

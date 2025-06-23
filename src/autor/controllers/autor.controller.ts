@@ -2,7 +2,9 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { Autor } from "../entities/autor.entity";
 import { AutorService } from "../services/autor.service";
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard";
-import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
+import { AtualizarAutorDto } from "../dtos/atualizarautor.dto";
+import { CriarAutorDto } from "../dtos/criarautor.dto";
 
 @ApiTags('Autor')
 @ApiBearerAuth()
@@ -32,14 +34,16 @@ export class AutorController{
 
     @Post() 
     @HttpCode(HttpStatus.CREATED)
-    create(@Body() autor: Autor): Promise<Autor> {
-        return this.autorService.create(autor);
+    @ApiBody({ type: CriarAutorDto })
+    create(@Body() autorDto: CriarAutorDto): Promise<Autor> {
+        return this.autorService.create(autorDto);
     }
 
     @Put() 
     @HttpCode(HttpStatus.OK)
-    update(@Body() autor: Autor): Promise<Autor> {
-        return this.autorService.update(autor);
+    @ApiBody({ type: AtualizarAutorDto })
+    update(@Body() autorDto: AtualizarAutorDto): Promise<Autor> {
+        return this.autorService.update(autorDto);
     }
 
     @Delete('/:id')

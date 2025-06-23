@@ -2,17 +2,7 @@ import { HttpStatus, INestApplication } from "@nestjs/common"
 import * as request from "supertest"
 import { AutorModule } from "../src/autor/autor.module"
 import { TestDatabaseHelper } from "./helpers/test-database.helper"
-
-interface AutorCreateDto {
-	nome: string
-	nacionalidade?: string
-}
-
-interface AutorUpdateDto {
-	id: number
-	nome: string
-	nacionalidade?: string
-}
+import { criarAutorPayload, criarAutorNoBanco, criarAutorUpdatePayload } from './helpers/payloads'
 
 describe("Autor E2E Tests", () => {
 	let testHelper: TestDatabaseHelper
@@ -28,7 +18,7 @@ describe("Autor E2E Tests", () => {
 	})
 
 	describe("GET /autores", () => {
-		it("Deve retornar todos os Autores", async () => {
+		it("Teste 1: Deve retornar todos os Autores", async () => {
 			const response = await request(app.getHttpServer())
 				.get("/autores")
 				.set("Authorization", "Bearer mock-token")
@@ -39,18 +29,9 @@ describe("Autor E2E Tests", () => {
 	})
 
 	describe("GET /autores/:id", () => {
-		it("deve retornar autor quando ID existir", async () => {
-			
-			const novoAutor: AutorCreateDto = {
-				nome: "Arlindo",
-				nacionalidade: "Brasileira"
-			}
-
-			const createResponse = await request(app.getHttpServer())
-				.post("/autores")
-				.set("Authorization", "Bearer mock-token")
-				.send(novoAutor)
-				.expect(HttpStatus.CREATED)
+		it("Teste 2: deve retornar autor quando ID existir", async () => {
+			const novoAutor = criarAutorPayload({ nome: "Arlindo" });
+			const createResponse = await criarAutorNoBanco(app, novoAutor);
 
 			const response = await request(app.getHttpServer())
 				.get(`/autores/${createResponse.body.id}`)
@@ -63,7 +44,7 @@ describe("Autor E2E Tests", () => {
 			})
 		})
 
-		it("deve retornar 404 quando ID não existir", async () => {
+		it("Teste 3: deve retornar 404 quando ID não existir", async () => {
 			await request(app.getHttpServer())
 				.get("/autores/999")
 				.set("Authorization", "Bearer mock-token")
@@ -72,17 +53,9 @@ describe("Autor E2E Tests", () => {
 	})
 
 	describe("GET /autores/nome/:nome", () => {
-		it("deve retornar lista de autores quando nome existir", async () => {
-			const novoAutor: AutorCreateDto = {
-				nome: "Zezinho",
-				nacionalidade: "Brasileira"
-			}
-
-			await request(app.getHttpServer())
-				.post("/autores")
-				.set("Authorization", "Bearer mock-token")
-				.send(novoAutor)
-				.expect(HttpStatus.CREATED)
+		it("Teste 4: deve retornar lista de autores quando nome existir", async () => {
+			const novoAutor = criarAutorPayload({ nome: "Zezinho" });
+			await criarAutorNoBanco(app, novoAutor);
 
 			const response = await request(app.getHttpServer())
 				.get(`/autores/nome/${novoAutor.nome}`)
@@ -96,7 +69,7 @@ describe("Autor E2E Tests", () => {
 			})
 		})
 
-		it("deve retornar lista vazia quando nome não existir", async () => {
+		it("Teste 5: deve retornar lista vazia quando nome não existir", async () => {
 			const response = await request(app.getHttpServer())
 				.get("/autores/nome/NomeInexistente")
 				.set("Authorization", "Bearer mock-token")
@@ -109,109 +82,73 @@ describe("Autor E2E Tests", () => {
 
 
 	describe("POST /autores", () => {
-		it("Deve criar um novo Autor", async () => {
-			const novoAutor: AutorCreateDto = {
-				nome: "Ziraldo",
-				nacionalidade: "Brasileira"
-			}
-
-			const response = await request(app.getHttpServer())
-				.post("/autores")
-				.set("Authorization", "Bearer mock-token")
-				.send(novoAutor)
-				.expect(HttpStatus.CREATED)
+		it("Teste 6: Deve criar um novo Autor", async () => {
+			const novoAutor = criarAutorPayload({ nome: "Ziraldo" });
+			const response = await criarAutorNoBanco(app, novoAutor);
 
 			expect(response.body).toHaveProperty("id")
 			expect(response.body.nome).toBe(novoAutor.nome)
 		})
 
-		it("Deve retornar erro ao criar Autor sem nome", async () => {
-			const autorInvalido = {}
-
+		it("Teste 7: Deve retornar erro ao criar Autor sem nome", async () => {
 			await request(app.getHttpServer())
 				.post("/autores")
 				.set("Authorization", "Bearer mock-token")
-				.send(autorInvalido)
+				.send({})
 				.expect(HttpStatus.BAD_REQUEST)
 		})
 	})
 
 	describe("PUT /autores", () => {
-		it("Deve atualizar um Autor existente", async () => {
-			// Primeiro cria um autor
-			const novoAutor: AutorCreateDto = {
-				nome: "Reinaldo",
+		it("Teste 8: Deve atualizar um Autor existente", async () => {
+			const novoAutor = criarAutorPayload({ nome: "Reinaldo" });
+			const createResponse = await criarAutorNoBanco(app, novoAutor);
+			
+			const autorAtualizado = criarAutorUpdatePayload(createResponse.body.id, {
+				nome: "Reinaldo Azevedo",
 				nacionalidade: "Brasileira"
-			}
-
-			const createResponse = await request(app.getHttpServer())
-				.post("/autores")
-				.set("Authorization", "Bearer mock-token")
-				.send(novoAutor)
-				.expect(HttpStatus.CREATED)
-
-			const autorId = createResponse.body.id
-
-			// Depois atualiza
-			const autorAtualizado: AutorUpdateDto = {
-				id: autorId,
-				nome: "Reinaldo Alves Pinto",
-				nacionalidade: "Brasileira"
-			}
+			});
 
 			const response = await request(app.getHttpServer())
 				.put("/autores")
 				.set("Authorization", "Bearer mock-token")
 				.send(autorAtualizado)
-				.expect(HttpStatus.OK)
+				.expect(HttpStatus.OK);
 
-			expect(response.body.nome).toBe(autorAtualizado.nome)
+			expect(response.body.nome).toBe(autorAtualizado.nome);
 		})
 
-		it("Deve retornar erro ao atualizar Autor inexistente", async () => {
-			const autorInexistente: AutorUpdateDto = {
-				id: 999,
-				nome: "Autor Inexistente"
-			}
+		it("Teste 9: Deve retornar erro ao atualizar Autor inexistente", async () => {
+			const autorInexistente = criarAutorUpdatePayload(999, {
+				nome: `Autor Inexistente ${Date.now()}`
+			});
 
 			await request(app.getHttpServer())
 				.put("/autores")
 				.set("Authorization", "Bearer mock-token")
 				.send(autorInexistente)
-				.expect(HttpStatus.NOT_FOUND)
+				.expect(HttpStatus.NOT_FOUND);
 		})
 	})
 
 	describe("DELETE /autores/:id", () => {
-		it("Deve deletar um Autor existente", async () => {
-			// Primeiro cria um autor
-			const novoAutor: AutorCreateDto = {
-				nome: "Geraldo",
-				nacionalidade: "Brasileira"
-			}
+		it("Teste 10: Deve deletar um Autor existente", async () => {
+			const novoAutor = criarAutorPayload({ nome: "Geraldo" });
+			const createResponse = await criarAutorNoBanco(app, novoAutor);
+			const autorId = createResponse.body.id;
 
-			const createResponse = await request(app.getHttpServer())
-				.post("/autores")
-				.set("Authorization", "Bearer mock-token")
-				.send(novoAutor)
-				.expect(HttpStatus.CREATED)
-
-			const autorId = createResponse.body.id
-
-			// Depois deleta
 			await request(app.getHttpServer())
 				.delete(`/autores/${autorId}`)
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.NO_CONTENT)
 
-			// Verifica se foi realmente deletado
 			await request(app.getHttpServer())
 				.get(`/autores/${autorId}`)
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.NOT_FOUND)
 		})
 
-		it("Deve retornar erro ao deletar Autor inexistente", async () => {
+		it("Teste 11: Deve retornar erro ao deletar Autor inexistente", async () => {
 			await request(app.getHttpServer())
 				.delete("/autores/999")
 				.set("Authorization", "Bearer mock-token")

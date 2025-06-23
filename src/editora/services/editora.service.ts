@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import { ILike, Repository } from "typeorm"
+import { ILike, Repository, In } from "typeorm"
 import { Editora } from "../entities/editora.entity"
 import { ErrorMessages } from "../../common/constants/error-messages"
+import { CriarEditoraDto } from "../dtos/criareditora.dto"
+import { AtualizarEditoraDto } from "../dtos/atualizareditora.dto"
 
 @Injectable()
 export class EditoraService {
@@ -21,6 +23,13 @@ export class EditoraService {
 			order: {
 				nome: "ASC"
 			}
+		})
+	}
+
+	async findAllByIds(ids: number[]): Promise<Editora[]> {
+		if (!Array.isArray(ids) || ids.length === 0) return []
+		return await this.editoraRepository.find({
+			where: { id: In(ids) }
 		})
 	}
 
@@ -53,44 +62,44 @@ export class EditoraService {
 		})
 	}
 
-	async create(editora: Editora): Promise<Editora> {
-		if (!editora?.nome?.trim()) {
+	async create(editoraDto: CriarEditoraDto): Promise<Editora> {
+		if (!editoraDto?.nome?.trim()) {
 			throw new BadRequestException(ErrorMessages.EDITORA.INVALID_DATA)
 		}
 
-		const editoraExistente = await this.findByNome(editora.nome.trim())
+		const editoraExistente = await this.findByNome(editoraDto.nome.trim())
 		if (editoraExistente) {
 			throw new BadRequestException(ErrorMessages.EDITORA.ALREADY_EXISTS)
 		}
 
 		try {
-			return await this.editoraRepository.save(editora)
+			return await this.editoraRepository.save(editoraDto)
 		} catch (error) {
 			this.logger.error('Erro ao criar editora:', error)
 			throw error
 		}
 	}
 
-	async update(editora: Editora): Promise<Editora> {
-		if (!editora?.id) {
+	async update(editoraDto: AtualizarEditoraDto): Promise<Editora> {
+		if (!editoraDto?.id) {
 			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 		}
 
-		if (!editora?.nome?.trim()) {
+		if (!editoraDto?.nome?.trim()) {
 			throw new BadRequestException(ErrorMessages.EDITORA.INVALID_DATA)
 		}
 
 		// Verificar se a editora existe
-		await this.findById(editora.id)
+		await this.findById(editoraDto.id)
 
 		// Verificar se já existe outra editora com o mesmo nome
-		const editoraExistente = await this.findByNome(editora.nome.trim())
-		if (editoraExistente && editoraExistente.id !== editora.id) {
+		const editoraExistente = await this.findByNome(editoraDto.nome.trim())
+		if (editoraExistente && editoraExistente.id !== editoraDto.id) {
 			throw new BadRequestException(ErrorMessages.EDITORA.ALREADY_EXISTS)
 		}
 
 		try {
-			return await this.editoraRepository.save(editora)
+			return await this.editoraRepository.save(editoraDto)
 		} catch (error) {
 			this.logger.error('Erro ao atualizar editora:', error)
 			throw error

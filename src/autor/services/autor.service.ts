@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { InjectRepository } from "@nestjs/typeorm"
-import { ILike, Repository } from "typeorm"
+import { ILike, Repository, In } from "typeorm"
 import { Autor } from "../entities/autor.entity"
 import { ErrorMessages } from "../../common/constants/error-messages"
+import { AtualizarAutorDto } from "../dtos/atualizarautor.dto"
+import { CriarAutorDto } from "../dtos/criarautor.dto"
 
 @Injectable()
 export class AutorService {
@@ -22,6 +24,13 @@ export class AutorService {
 				nome: "ASC"
 			}
 		})
+	}
+
+	async findAllByIds(ids: number[]): Promise<Autor[]> {
+		if (!Array.isArray(ids) || ids.length === 0) return [];
+		return await this.autorRepository.find({
+			where: { id: In(ids) }
+		});
 	}
 
 	async findById(id: number): Promise<Autor> {
@@ -53,44 +62,44 @@ export class AutorService {
 		})
 	}
 
-	async create(autor: Autor): Promise<Autor> {
-		if (!autor?.nome?.trim()) {
+	async create(autorDto: CriarAutorDto): Promise<Autor> {
+		if (!autorDto?.nome?.trim()) {
 			throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
 		}
 
-		const autorExistente = await this.findByNome(autor.nome.trim())
+		const autorExistente = await this.findByNome(autorDto.nome.trim())
 		if (autorExistente) {
 			throw new BadRequestException(ErrorMessages.AUTHOR.ALREADY_EXISTS)
 		}
 
 		try {
-			return await this.autorRepository.save(autor)
+			return await this.autorRepository.save(autorDto)
 		} catch (error) {
 			this.logger.error('Erro ao criar autor:', error)
 			throw error
 		}
 	}
 
-	async update(autor: Autor): Promise<Autor> {
-		if (!autor?.id) {
+	async update(autorDto: AtualizarAutorDto): Promise<Autor> {
+		if (!autorDto?.id) {
 			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 		}
 
-		if (!autor?.nome?.trim()) {
+		if (!autorDto?.nome?.trim()) {
 			throw new BadRequestException(ErrorMessages.AUTHOR.INVALID_DATA)
 		}
 
 		// Verificar se o autor existe
-		await this.findById(autor.id)
+		await this.findById(autorDto.id)
 
 		// Verificar se já existe outro autor com o mesmo nome
-		const autorExistente = await this.findByNome(autor.nome.trim())
-		if (autorExistente && autorExistente.id !== autor.id) {
+		const autorExistente = await this.findByNome(autorDto.nome.trim())
+		if (autorExistente && autorExistente.id !== autorDto.id) {
 			throw new BadRequestException(ErrorMessages.AUTHOR.ALREADY_EXISTS)
 		}
 
 		try {
-			return await this.autorRepository.save(autor)
+			return await this.autorRepository.save(autorDto)
 		} catch (error) {
 			this.logger.error('Erro ao atualizar autor:', error)
 			throw error

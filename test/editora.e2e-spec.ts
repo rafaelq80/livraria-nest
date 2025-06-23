@@ -2,15 +2,7 @@ import { HttpStatus, INestApplication } from "@nestjs/common"
 import * as request from "supertest"
 import { EditoraModule } from "../src/editora/editora.module"
 import { TestDatabaseHelper } from "./helpers/test-database.helper"
-
-interface EditoraCreateDto {
-	nome: string
-}
-
-interface EditoraUpdateDto {
-	id: number
-	nome: string
-}
+import { criarEditoraPayload, criarEditoraNoBanco } from './helpers/payloads'
 
 describe("Editora E2E Tests", () => {
 	let testHelper: TestDatabaseHelper
@@ -38,16 +30,8 @@ describe("Editora E2E Tests", () => {
 
 	describe("GET /editoras/:id", () => {
 		it("deve retornar editora quando ID existir", async () => {
-			
-			const novoEditora: EditoraCreateDto = {
-				nome: "Sextante"
-			}
-
-			const createResponse = await request(app.getHttpServer())
-				.post("/editoras")
-				.set("Authorization", "Bearer mock-token")
-				.send(novoEditora)
-				.expect(HttpStatus.CREATED)
+			const novoEditora = criarEditoraPayload({ nome: "Sextante" });
+			const createResponse = await criarEditoraNoBanco(app, novoEditora);
 
 			const response = await request(app.getHttpServer())
 				.get(`/editoras/${createResponse.body.id}`)
@@ -70,15 +54,8 @@ describe("Editora E2E Tests", () => {
 
 	describe("GET /editoras/nome/:nome", () => {
 		it("deve retornar lista de editoras quando nome existir", async () => {
-			const novoEditora: EditoraCreateDto = {
-				nome: "Melhoramentos"
-			}
-
-			await request(app.getHttpServer())
-				.post("/editoras")
-				.set("Authorization", "Bearer mock-token")
-				.send(novoEditora)
-				.expect(HttpStatus.CREATED)
+			const novoEditora = criarEditoraPayload({ nome: "Melhoramentos" });
+			await criarEditoraNoBanco(app, novoEditora);
 
 			const response = await request(app.getHttpServer())
 				.get(`/editoras/nome/${novoEditora.nome}`)
@@ -105,15 +82,8 @@ describe("Editora E2E Tests", () => {
 
 	describe("POST /editoras", () => {
 		it("Deve criar uma nova Editora", async () => {
-			const novaEditora: EditoraCreateDto = {
-				nome: "Editora Globo"
-			}
-
-			const response = await request(app.getHttpServer())
-				.post("/editoras")
-				.set("Authorization", "Bearer mock-token")
-				.send(novaEditora)
-				.expect(HttpStatus.CREATED)
+			const novaEditora = criarEditoraPayload({ nome: "Editora Globo" });
+			const response = await criarEditoraNoBanco(app, novaEditora);
 
 			expect(response.body).toHaveProperty("id")
 			expect(response.body.nome).toBe(novaEditora.nome)
@@ -132,21 +102,12 @@ describe("Editora E2E Tests", () => {
 
 	describe("PUT /editoras", () => {
 		it("Deve atualizar uma Editora existente", async () => {
-			// Primeiro cria uma editora
-			const novaEditora: EditoraCreateDto = {
-				nome: "Editora Bookman"
-			}
-
-			const createResponse = await request(app.getHttpServer())
-				.post("/editoras")
-				.set("Authorization", "Bearer mock-token")
-				.send(novaEditora)
-				.expect(HttpStatus.CREATED)
+			const novaEditora = criarEditoraPayload({ nome: "Editora Bookman" });
+			const createResponse = await criarEditoraNoBanco(app, novaEditora);
 
 			const editoraId = createResponse.body.id
 
-			// Depois atualiza
-			const editoraAtualizada: EditoraUpdateDto = {
+			const editoraAtualizada = {
 				id: editoraId,
 				nome: "Editora Bookman International"
 			}
@@ -161,7 +122,7 @@ describe("Editora E2E Tests", () => {
 		})
 
 		it("Deve retornar erro ao atualizar Editora inexistente", async () => {
-			const editoraInexistente: EditoraUpdateDto = {
+			const editoraInexistente = {
 				id: 999,
 				nome: "Editora Inexistente"
 			}
@@ -176,26 +137,16 @@ describe("Editora E2E Tests", () => {
 
 	describe("DELETE /editoras/:id", () => {
 		it("Deve deletar uma Editora existente", async () => {
-			// Primeiro cria uma editora
-			const novaEditora: EditoraCreateDto = {
-				nome: "Editora Paulus"
-			}
-
-			const createResponse = await request(app.getHttpServer())
-				.post("/editoras")
-				.set("Authorization", "Bearer mock-token")
-				.send(novaEditora)
-				.expect(HttpStatus.CREATED)
+			const novaEditora = criarEditoraPayload({ nome: "Editora Paulus" });
+			const createResponse = await criarEditoraNoBanco(app, novaEditora);
 
 			const editoraId = createResponse.body.id
 
-			// Depois deleta
 			await request(app.getHttpServer())
 				.delete(`/editoras/${editoraId}`)
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.NO_CONTENT)
 
-			// Verifica se foi realmente deletada
 			await request(app.getHttpServer())
 				.get(`/editoras/${editoraId}`)
 				.set("Authorization", "Bearer mock-token")

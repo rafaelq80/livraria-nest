@@ -58,6 +58,8 @@ export const ErrorMessages = {
         NOT_FOUND: "Produto não encontrado.",
         ALREADY_EXISTS: "Produto já existe.",
         INVALID_DATA: "Dados do produto inválidos.",
+        CREATE_FAILED: "Falha ao criar produto.",
+        UPDATE_FAILED: "Falha ao atualizar produto.",
     },
 
     // Editora
@@ -96,6 +98,7 @@ export const ErrorMessages = {
         OPERATION_FAILED: "Operação falhou.",
         VALIDATION_FAILED: "Validação falhou.",
         SERVER_ERROR: "Erro interno do servidor. Por favor, tente novamente mais tarde.",
+        INVALID_DATA: "Dados inválidos.",
     },
 
     // E-mail

@@ -1,9 +1,26 @@
 import { ApiProperty } from "@nestjs/swagger"
-import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Length, Max, Min } from "class-validator"
+import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Length, Max, Min, ValidateNested, ArrayMinSize } from "class-validator"
+import { Type , Transform } from 'class-transformer'
 import { Autor } from "../../autor/entities/autor.entity"
 import { Categoria } from "../../categoria/entities/categoria.entity"
 import { Editora } from "../../editora/entities/editora.entity"
 import { IsISBN10, IsISBN13 } from "../validators/isisbn.validator"
+
+// DTOs Auxiliares
+export class CategoriaIdDto {
+	@IsNumber()
+	id: number;
+}
+
+export class EditoraIdDto {
+	@IsNumber()
+	id: number;
+}
+
+export class AutorIdDto {
+	@IsNumber()
+	id: number;
+}
 
 export class CriarProdutoDto {
 	@ApiProperty({
@@ -123,20 +140,28 @@ export class CriarProdutoDto {
 		description: "Autores do livro",
 		type: () => [Autor],
 	})
-	@IsNotEmpty({ message: "Autores são obrigatórios" })
-	autores: Autor[]
+	@ArrayMinSize(1, { message: 'Pelo menos um autor é obrigatório' })
+	@ValidateNested({ each: true })
+	@Transform(({ value }) => typeof value === 'string' ? JSON.parse(value) : value)
+	@Type(() => AutorIdDto)
+	autores: AutorIdDto[]
 
 	@ApiProperty({
 		description: "Categoria do livro",
 		type: () => Categoria,
 	})
-	@IsNotEmpty({ message: "Categoria é obrigatória" })
-	categoria: Categoria
+	@ValidateNested()
+	@Transform(({ value }) => typeof value === 'string' ? JSON.parse(value) : value)
+	@Type(() => CategoriaIdDto)
+	categoria: CategoriaIdDto
 
 	@ApiProperty({
 		description: "Editora do livro",
 		type: () => Editora,
 	})
-	@IsNotEmpty({ message: "Editora é obrigatória" })
-	editora: Editora
+	@ValidateNested()
+	@Transform(({ value }) => typeof value === 'string' ? JSON.parse(value) : value)
+	@Type(() => EditoraIdDto)
+	editora: EditoraIdDto
 }
+

@@ -2,7 +2,9 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { Categoria } from "../entities/categoria.entity";
 import { CategoriaService } from "../services/categoria.service";
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard";
-import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
+import { CriarCategoriaDto } from "../dtos/criarcategoria.dto";
+import { AtualizarCategoriaDto } from "../dtos/atualizarcategoria.dto";
 
 @ApiTags('Categoria')
 @ApiBearerAuth()
@@ -32,14 +34,16 @@ export class CategoriaController{
 
     @Post() 
     @HttpCode(HttpStatus.CREATED)
-    create(@Body() categoria: Categoria): Promise<Categoria> {
-        return this.categoriaService.create(categoria);
+    @ApiBody({ type: CriarCategoriaDto })
+    create(@Body() categoriaDto: CriarCategoriaDto): Promise<Categoria> {
+        return this.categoriaService.create(categoriaDto);
     }
 
     @Put() 
     @HttpCode(HttpStatus.OK)
-    update(@Body() categoria: Categoria): Promise<Categoria> {
-        return this.categoriaService.update(categoria);
+    @ApiBody({ type: AtualizarCategoriaDto })
+    update(@Body() categoriaDto: AtualizarCategoriaDto): Promise<Categoria> {
+        return this.categoriaService.update(categoriaDto);
     }
 
     @Delete('/:id')
