@@ -4,6 +4,7 @@ import { SecurityService } from "../services/security.service"
 import { ErrorMessages } from "../../common/constants/error-messages"
 import { ApiTags, ApiResponse } from "@nestjs/swagger"
 import { UsuarioAutenticado } from "../interfaces/usuarioautenticado.interface"
+import { Public } from "../decorators/public.decorator"
 
 @ApiTags("Autenticação Google")
 @Controller("/auth")
@@ -13,6 +14,7 @@ export class GoogleController {
 
 	@Get("/google")
 	@UseGuards(GoogleAuthGuard)
+	@Public()
 	@ApiResponse({
 		status: 302,
 		description: "Redireciona para o login do Google."
@@ -23,6 +25,7 @@ export class GoogleController {
 
 	@Get("/google/callback")
 	@UseGuards(GoogleAuthGuard)
+	@Public()
 	@ApiResponse({
 		status: 200,
 		description: "Login com Google realizado com sucesso.",

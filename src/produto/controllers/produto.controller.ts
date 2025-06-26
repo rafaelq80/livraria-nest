@@ -1,5 +1,6 @@
 import {
 	Body,
+	ClassSerializerInterceptor,
 	Controller,
 	Delete,
 	Get,
@@ -14,94 +15,192 @@ import {
 	UseInterceptors
 } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger"
-import { ValidatedImage } from "../../imagekit/decorators/image-validation.decorator"
-import { UseImageKit } from "../../imagekit/decorators/imagekit.decorator"
-import { Public } from "../../security/decorators/public.decorator"
+import {
+	ApiBearerAuth,
+	ApiConsumes,
+	ApiResponse,
+	ApiTags
+} from "@nestjs/swagger"
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard"
 import { AtualizarProdutoDto } from "../dtos/atualizarproduto.dto"
 import { CriarProdutoDto } from "../dtos/criarproduto.dto"
-import { Produto } from "../entities/produto.entity"
 import { ProdutoService } from "../services/produto.service"
+import { UseImageKit } from "../../imagekit/decorators/imagekit.decorator"
+import { ValidatedImage } from "../../imagekit/decorators/image-validation.decorator"
+import { Public } from "../../security/decorators/public.decorator"
 
 @ApiTags("Produtos")
 @ApiBearerAuth()
+@UseInterceptors(ClassSerializerInterceptor)
 @Controller("/produtos")
 export class ProdutoController {
 	private readonly logger = new Logger(ProdutoController.name)
 
-	constructor(
-		private readonly produtoService: ProdutoService,
-	) {}
+	constructor(private readonly produtoService: ProdutoService) {}
 
-
-	@Public()
 	@Get()
-	@ApiOperation({ summary: 'Listar todos os produtos' })
-	@ApiResponse({ status: 200, description: 'Lista de produtos retornada com sucesso', type: [Produto] })
-	async findAll(): Promise<Produto[]> {
-		return await this.produtoService.findAll()
+	@HttpCode(HttpStatus.OK)
+	@Public()
+	@ApiResponse({
+		status: 200,
+		description: "Produtos encontrados.",
+		schema: {
+			example: {
+				status: "success",
+				message: "Produtos encontrados.",
+				data: [
+					{
+						id: 1,
+						titulo: "Livro Teste",
+						sinopse: "Sinopse do livro",
+						paginas: 100,
+						anoPublicacao: 2022,
+						preco: 50.0,
+						idioma: "Português",
+						isbn10: "1234567890",
+						isbn13: "1234567890123",
+						desconto: 0,
+						edicao: 1,
+						categoria: { id: 1, tipo: "Ficção" },
+						editora: { id: 1, nome: "Editora Teste" },
+						autores: [{ id: 1, nome: "Autor Teste" }],
+						createdAt: "2024-01-01T00:00:00.000Z",
+						updatedAt: "2024-01-01T00:00:00.000Z",
+					},
+				],
+			},
+		},
+	})
+	async findAll() {
+		const produtos = await this.produtoService.findAll()
+		return {
+			status: "success",
+			message: "Produtos encontrados.",
+			data: produtos,
+		}
 	}
 
 	@Get("/:id")
-	@ApiOperation({ summary: 'Buscar produto por ID' })
-	@ApiParam({ name: 'id', description: 'ID do produto', type: 'number' })
-	@ApiResponse({ status: 200, description: 'Produto encontrado com sucesso', type: Produto })
-	@ApiResponse({ status: 404, description: 'Produto não encontrado' })
-	async findById(@Param("id", ParseIntPipe) id: number): Promise<Produto> {
-		return await this.produtoService.findById(id)
+	@HttpCode(HttpStatus.OK)
+	@Public()
+	@ApiResponse({
+		status: 200,
+		description: "Produto encontrado.",
+		schema: {
+			example: {
+				status: "success",
+				message: "Produto encontrado.",
+				data: {
+					id: 1,
+					titulo: "Livro Teste",
+					sinopse: "Sinopse do livro",
+					paginas: 100,
+					anoPublicacao: 2022,
+					preco: 50.0,
+					idioma: "Português",
+					isbn10: "1234567890",
+					isbn13: "1234567890123",
+					desconto: 0,
+					edicao: 1,
+					categoria: { id: 1, tipo: "Ficção" },
+					editora: { id: 1, nome: "Editora Teste" },
+					autores: [{ id: 1, nome: "Autor Teste" }],
+					createdAt: "2024-01-01T00:00:00.000Z",
+					updatedAt: "2024-01-01T00:00:00.000Z",
+				},
+			},
+		},
+	})
+	async findById(@Param("id", ParseIntPipe) id: number) {
+		const produto = await this.produtoService.findById(id)
+		return {
+			status: "success",
+			message: "Produto encontrado.",
+			data: produto,
+		}
 	}
 
 	@Get("/titulo/:titulo")
-	@ApiOperation({ summary: 'Buscar produtos por título' })
-	@ApiQuery({ name: 'titulo', description: 'Título do produto para busca', required: true })
-	@ApiResponse({ status: 200, description: 'Produtos encontrados com sucesso', type: [Produto] })
-	async findAllByTitulo(@Param('titulo') titulo: string): Promise<Produto[]> {
-		return await this.produtoService.findAllByTitulo(titulo)
+	@HttpCode(HttpStatus.OK)
+	@ApiResponse({
+		status: 200,
+		description: "Produtos encontrados por título.",
+		schema: {
+			example: {
+				status: "success",
+				message: "Produtos encontrados por título.",
+				data: [
+					{
+						id: 1,
+						titulo: "Livro Teste",
+						sinopse: "Sinopse do livro",
+						paginas: 100,
+						anoPublicacao: 2022,
+						preco: 50.0,
+						idioma: "Português",
+						isbn10: "1234567890",
+						isbn13: "1234567890123",
+						desconto: 0,
+						edicao: 1,
+						categoria: { id: 1, tipo: "Ficção" },
+						editora: { id: 1, nome: "Editora Teste" },
+						autores: [{ id: 1, nome: "Autor Teste" }],
+						createdAt: "2024-01-01T00:00:00.000Z",
+						updatedAt: "2024-01-01T00:00:00.000Z",
+					},
+				],
+			},
+		},
+	})
+	async findByTitulo(@Param("titulo") titulo: string) {
+		const produtos = await this.produtoService.findAllByTitulo(titulo)
+		return {
+			status: "success",
+			message: "Produtos encontrados por título.",
+			data: produtos,
+		}
 	}
 
 	@Post()
-	@UseGuards(JwtAuthGuard)
-	@HttpCode(HttpStatus.CREATED)
-	@ApiOperation({ summary: 'Criar um novo produto' })
-	@ApiResponse({ status: 201, description: 'Produto criado com sucesso', type: Produto })
-	@ApiResponse({ status: 400, description: 'Dados inválidos' })
 	@ApiConsumes('multipart/form-data')
-	@ApiBody({ type: CriarProdutoDto })
 	@UseImageKit()
-	@UseInterceptors(FileInterceptor("fotoFile"))
+	@UseInterceptors(FileInterceptor('fotoFile'))
+	@HttpCode(HttpStatus.CREATED)
+	@UseGuards(JwtAuthGuard)
 	async create(
 		@Body() produtoDto: CriarProdutoDto,
-		@ValidatedImage({ validateDimensions: true }) fotoFile?: Express.Multer.File,
-	): Promise<Produto> {
-		return await this.produtoService.create(produtoDto, fotoFile);
+		@ValidatedImage() fotoFile?: Express.Multer.File,
+	) {
+		const produto = await this.produtoService.create(produtoDto, fotoFile)
+		return {
+			status: "success",
+			message: "Produto criado com sucesso.",
+			data: produto,
+		}
 	}
 
 	@Put()
-	@UseGuards(JwtAuthGuard)
-	@ApiOperation({ summary: 'Atualizar um produto existente' })
-	@ApiResponse({ status: 200, description: 'Produto atualizado com sucesso', type: Produto })
-	@ApiResponse({ status: 400, description: 'Dados inválidos' })
-	@ApiResponse({ status: 404, description: 'Produto não encontrado' })
 	@ApiConsumes('multipart/form-data')
-	@ApiBody({ type: AtualizarProdutoDto })
 	@UseImageKit()
 	@UseInterceptors(FileInterceptor('fotoFile'))
+	@HttpCode(HttpStatus.OK)
+	@UseGuards(JwtAuthGuard)
 	async update(
 		@Body() produtoDto: AtualizarProdutoDto,
-		@ValidatedImage({ validateDimensions: true }) fotoFile?: Express.Multer.File
-	): Promise<Produto> {
-		return await this.produtoService.update(produtoDto, fotoFile)
+		@ValidatedImage({ validateDimensions: true }) fotoFile?: Express.Multer.File,
+	) {
+		const produto = await this.produtoService.update(produtoDto, fotoFile)
+		return {
+			status: "success",
+			message: "Produto atualizado com sucesso.",
+			data: produto,
+		}
 	}
 
 	@Delete("/:id")
-	@UseGuards(JwtAuthGuard)
-	@ApiOperation({ summary: 'Remover um produto' })
-	@ApiParam({ name: 'id', description: 'ID do produto', type: 'number' })
-	@ApiResponse({ status: 204, description: 'Produto removido com sucesso' })
-	@ApiResponse({ status: 404, description: 'Produto não encontrado' })
 	@HttpCode(HttpStatus.NO_CONTENT)
-	async remove(@Param("id", ParseIntPipe) id: number): Promise<void> {
+	@UseGuards(JwtAuthGuard)
+	async delete(@Param("id", ParseIntPipe) id: number) {
 		await this.produtoService.delete(id)
 	}
 }

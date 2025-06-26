@@ -1,79 +1,124 @@
 import { DynamicModule, INestApplication, Type, ValidationPipe } from "@nestjs/common"
 import { Test, TestingModule } from "@nestjs/testing"
-import { TypeOrmModule, TypeOrmModuleOptions } from "@nestjs/typeorm"
-import { Autor } from "../../src/autor/entities/autor.entity"
-import { Categoria } from "../../src/categoria/entities/categoria.entity"
-import { Editora } from "../../src/editora/entities/editora.entity"
-import { Produto } from "../../src/produto/entities/produto.entity"
-import { Role } from "../../src/role/entities/role.entity"
-import { Usuario } from "../../src/usuario/entities/usuario.entity"
-import { JwtAuthGuard } from "../../src/security/guards/jwt-auth.guard"
+import { TypeOrmModule } from "@nestjs/typeorm"
 import { ConfigModule } from "@nestjs/config"
+import { JwtAuthGuard } from "../../src/security/guards/jwt-auth.guard"
+import { RolesAuthGuard } from "../../src/security/guards/roles-auth.guard"
 import { ImageKitService } from "../../src/imagekit/services/imagekit.service"
 import { SendmailService } from "../../src/sendmail/services/sendmail.service"
 
+// Importações dos arquivos separados
+import { testConfig, TestConfigOverrides } from "./test-config"
+import { mockImageKitService, mockSendmailService, mockAuthGuards } from "./test-mocks"
+import { createTestTypeOrmConfig, TestTypeOrmConfigOptions } from "./test-entities"
+
+/**
+ * Helper para criação e gerenciamento de módulos de teste E2E
+ * 
+ * Responsabilidades:
+ * - Criar aplicação NestJS para testes
+ * - Configurar banco de dados SQLite em memória
+ * - Aplicar mocks de serviços externos
+ * - Gerenciar ciclo de vida da aplicação
+ */
 export class TestDatabaseHelper {
     private app!: INestApplication
 
-    async createTestModule(modules: (Type<unknown> | DynamicModule)[]): Promise<INestApplication> {
-        const typeOrmConfig: TypeOrmModuleOptions = {
-            type: "sqlite",
-            database: ":memory:",
-            entities: [Usuario, Produto, Categoria, Autor, Editora, Role],
-            synchronize: true,
-            dropSchema: true
-        }
+    /**
+     * Cria um módulo de teste com configurações customizáveis
+     */
+    async createTestModule(
+        modules: (Type<unknown> | DynamicModule)[],
+        configOverrides: TestConfigOverrides = {},
+        typeOrmOptions: TestTypeOrmConfigOptions = {}
+    ): Promise<INestApplication> {
+        // Mescla configurações padrão com customizações
+        const mergedConfig = this.mergeConfigurations(testConfig(), configOverrides)
+        const typeOrmConfig = createTestTypeOrmConfig(typeOrmOptions)
 
         const moduleFixture: TestingModule = await Test.createTestingModule({
             imports: [
                 ConfigModule.forRoot({
                     isGlobal: true,
-                    load: [() => ({
-                        IMAGEKIT_URL_ENDPOINT: 'https://test.imagekit.io/your-test-endpoint',
-                        IMAGEKIT_PRIVATE_KEY: 'test-private-key',
-                    })],
+                    load: [() => mergedConfig],
                 }),
                 TypeOrmModule.forRoot(typeOrmConfig),
-                ...modules
-            ]
+                ...modules,
+            ],
         })
         .overrideGuard(JwtAuthGuard)
-        .useValue({ canActivate: () => true })
+        .useValue(mockAuthGuards)
+        .overrideGuard(RolesAuthGuard)
+        .useValue(mockAuthGuards)
         .overrideProvider(ImageKitService)
-        .useValue({
-            processarUsuarioImage: jest.fn().mockResolvedValue('https://fake.image.url/test.jpg'),
-            processarEditoraImage: jest.fn().mockResolvedValue('https://fake.image.url/test.jpg'),
-            processarProdutoImage: jest.fn().mockResolvedValue('https://fake.image.url/test.jpg'),
-        })
+        .useValue(mockImageKitService)
         .overrideProvider(SendmailService)
-        .useValue({
-            sendmailConfirmacaoLegacy: jest.fn().mockResolvedValue(undefined),
-            sendmailRecuperarSenhaLegacy: jest.fn().mockResolvedValue(undefined),
-            sendMail: jest.fn().mockResolvedValue(undefined),
-        })
+        .useValue(mockSendmailService)
         .compile()
 
         this.app = moduleFixture.createNestApplication()
 
+        // Configuração global de validação
         this.app.useGlobalPipes(
             new ValidationPipe({
-              whitelist: true,
-              forbidNonWhitelisted: true,
-              transform: true,
-              transformOptions: {
-                enableImplicitConversion: true,
-              },
+                whitelist: true,
+                forbidNonWhitelisted: true,
+                transform: true,
+                transformOptions: {
+                    enableImplicitConversion: true,
+                },
             })
-          );
+        )
 
         await this.app.init()
-
         return this.app
     }
 
+    /**
+     * Fecha a aplicação de teste de forma segura
+     * Limpa recursos e zera referências para evitar vazamentos de memória
+     */
     async cleanup(): Promise<void> {
         if (this.app) {
             await this.app.close()
+            this.app = undefined!
         }
+    }
+
+    /**
+     * Mescla configurações padrão com customizações
+     * Implementa merge profundo para objetos aninhados
+     */
+    private mergeConfigurations(
+        baseConfig: Record<string, unknown>, 
+        overrides: TestConfigOverrides
+    ): Record<string, unknown> {
+        const merged = { ...baseConfig }
+
+        Object.keys(overrides).forEach((key) => {
+            if (overrides[key] && typeof overrides[key] === 'object') {
+                merged[key] = {
+                    ...(merged[key] as Record<string, unknown>),
+                    ...(overrides[key] as Record<string, unknown>),
+                }
+            }
+        })
+
+        return merged
+    }
+
+    /**
+     * Obtém a instância da aplicação atual
+     * Útil para acessar a aplicação em testes específicos
+     */
+    getApp(): INestApplication | undefined {
+        return this.app
+    }
+
+    /**
+     * Verifica se a aplicação está ativa
+     */
+    isAppActive(): boolean {
+        return !!this.app
     }
 } 

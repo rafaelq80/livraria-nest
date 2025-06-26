@@ -2,6 +2,7 @@
 	Body,
 	ClassSerializerInterceptor,
 	Controller,
+	Delete,
 	Get,
 	HttpCode,
 	HttpStatus,
@@ -21,6 +22,8 @@ import { UsuarioService } from "../services/usuario.service"
 import { Public } from "../../security/decorators/public.decorator"
 import { UseImageKit } from "../../imagekit/decorators/imagekit.decorator"
 import { ValidatedImage } from "../../imagekit/decorators/image-validation.decorator"
+import { RolesAuthGuard } from "../../security/guards/roles-auth.guard"
+import { Roles } from "../../security/decorators/roles.decorator"
 
 @ApiTags("Usuário")
 @ApiBearerAuth()
@@ -152,5 +155,13 @@ export class UsuarioController {
 			message: 'Usuário atualizado com sucesso.',
 			data: usuario
 		};
+	}
+
+	@UseGuards(JwtAuthGuard, RolesAuthGuard)
+	@Roles("admin") 
+	@Delete(":id")
+	@HttpCode(HttpStatus.NO_CONTENT)
+	async delete(@Param("id", ParseIntPipe) id: number) {
+		await this.usuarioService.delete(id);
 	}
 }

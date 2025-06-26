@@ -1,8 +1,7 @@
-import { HttpStatus, INestApplication } from "@nestjs/common"
+import { HttpStatus, INestApplication, Logger } from "@nestjs/common"
 import * as request from "supertest"
 import { EditoraModule } from "../src/editora/editora.module"
-import { TestDatabaseHelper } from "./helpers/test-database.helper"
-import { criarEditoraPayload, criarEditoraNoBanco } from './helpers/payloads'
+import { criarEditoraNoBanco, criarEditoraPayload, criarEditoraUpdatePayload , TestDatabaseHelper } from './helpers'
 
 describe("Editora E2E Tests", () => {
 	let testHelper: TestDatabaseHelper
@@ -10,7 +9,19 @@ describe("Editora E2E Tests", () => {
 
 	beforeAll(async () => {
 		testHelper = new TestDatabaseHelper()
-		app = await testHelper.createTestModule([EditoraModule])
+		app = await testHelper.createTestModule(
+			[EditoraModule],
+			{
+				// Configurações específicas para testes de editora
+				jwt: {
+					expiration: '1h',
+				},
+				app: {
+					environment: 'test-editora',
+				}
+			}
+		)
+		jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {})
 	})
 
 	afterAll(async () => {
@@ -18,142 +29,198 @@ describe("Editora E2E Tests", () => {
 	})
 
 	describe("GET /editoras", () => {
-		it("Deve retornar todas as Editoras", async () => {
+		it("Teste 1: Deve retornar todas as Editoras", async () => {
 			const response = await request(app.getHttpServer())
 				.get("/editoras")
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toBeInstanceOf(Array)
+			expect(response.body.data).toBeInstanceOf(Array)
 		})
 	})
 
 	describe("GET /editoras/:id", () => {
-		it("deve retornar editora quando ID existir", async () => {
-			const novoEditora = criarEditoraPayload({ nome: "Sextante" });
-			const createResponse = await criarEditoraNoBanco(app, novoEditora);
+		it("Teste 2: deve retornar editora quando ID existir", async () => {
+			const novaEditora = criarEditoraPayload({ nome: "Editora Moderna" });
+			const createResponse = await criarEditoraNoBanco(app, novaEditora);
 
 			const response = await request(app.getHttpServer())
-				.get(`/editoras/${createResponse.body.id}`)
+				.get(`/editoras/${createResponse.id}`)
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toMatchObject({
-				id: createResponse.body.id,
-				nome: novoEditora.nome
+			expect(response.body.data).toMatchObject({
+				id: createResponse.id,
+				nome: novaEditora.nome
 			})
 		})
 
-		it("deve retornar 404 quando ID não existir", async () => {
+		it("Teste 3: deve retornar 404 quando ID não existir", async () => {
 			await request(app.getHttpServer())
 				.get("/editoras/999")
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.NOT_FOUND)
 		})
+
+		it("Teste 4: deve retornar 400 quando ID for inválido", async () => {
+			await request(app.getHttpServer())
+				.get("/editoras/abc")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.BAD_REQUEST)
+		})
 	})
 
 	describe("GET /editoras/nome/:nome", () => {
-		it("deve retornar lista de editoras quando nome existir", async () => {
-			const novoEditora = criarEditoraPayload({ nome: "Melhoramentos" });
-			await criarEditoraNoBanco(app, novoEditora);
+		it("Teste 5: deve retornar lista de editoras quando nome existir", async () => {
+			const novaEditora = criarEditoraPayload({ nome: "Editora Nacional" });
+			await criarEditoraNoBanco(app, novaEditora);
 
 			const response = await request(app.getHttpServer())
-				.get(`/editoras/nome/${novoEditora.nome}`)
+				.get(`/editoras/nome/${novaEditora.nome}`)
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toBeInstanceOf(Array)
-			expect(response.body.length).toBeGreaterThan(0)
-			expect(response.body[0]).toMatchObject({
-				nome: novoEditora.nome
+			expect(response.body.data).toBeInstanceOf(Array)
+			expect(response.body.data.length).toBeGreaterThan(0)
+			expect(response.body.data[0]).toMatchObject({
+				nome: novaEditora.nome
 			})
 		})
 
-		it("deve retornar lista vazia quando nome não existir", async () => {
+		it("Teste 6: deve retornar lista vazia quando nome não existir", async () => {
 			const response = await request(app.getHttpServer())
 				.get("/editoras/nome/NomeInexistente")
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toBeInstanceOf(Array)
-			expect(response.body.length).toBe(0)
+			expect(response.body.data).toBeInstanceOf(Array)
+			expect(response.body.data.length).toBe(0)
+		})
+
+		it("Teste 7: deve fazer busca parcial", async () => {
+			await criarEditoraNoBanco(app, { nome: "Editora Brasileira Ltda" });
+
+			const response = await request(app.getHttpServer())
+				.get("/editoras/nome/Brasileira")
+				.set("Authorization", "Bearer mock-token")
+				.expect(HttpStatus.OK)
+
+			expect(response.body.data).toBeInstanceOf(Array)
+			expect(response.body.data.length).toBeGreaterThan(0)
+			expect(response.body.data.some(e => e.nome.includes("Brasileira"))).toBe(true)
 		})
 	})
 
 	describe("POST /editoras", () => {
-		it("Deve criar uma nova Editora", async () => {
-			const novaEditora = criarEditoraPayload({ nome: "Editora Globo" });
+		it("Teste 8: Deve criar uma nova Editora", async () => {
+			const novaEditora = criarEditoraPayload({ nome: "Editora Nova" });
 			const response = await criarEditoraNoBanco(app, novaEditora);
 
-			expect(response.body).toHaveProperty("id")
-			expect(response.body.nome).toBe(novaEditora.nome)
+			expect(response).toHaveProperty("id")
+			expect(response.nome).toBe(novaEditora.nome)
 		})
 
-		it("Deve retornar erro ao criar Editora sem nome", async () => {
-			const editoraInvalida = {}
+		it("Teste 9: Deve retornar erro ao criar Editora sem nome", async () => {
+			await request(app.getHttpServer())
+				.post("/editoras")
+				.set("Authorization", "Bearer mock-token")
+				.send({})
+				.expect(HttpStatus.BAD_REQUEST)
+		})
+
+		it("Teste 10: Deve retornar erro ao criar Editora com nome muito curto", async () => {
+			await request(app.getHttpServer())
+				.post("/editoras")
+				.set("Authorization", "Bearer mock-token")
+				.send({ nome: "A" })
+				.expect(HttpStatus.BAD_REQUEST)
+		})
+
+		it("Teste 11: Deve retornar erro ao criar Editora com nome duplicado", async () => {
+			const nomeEditora = "Editora Duplicada";
+			await criarEditoraNoBanco(app, { nome: nomeEditora });
 
 			await request(app.getHttpServer())
 				.post("/editoras")
 				.set("Authorization", "Bearer mock-token")
-				.send(editoraInvalida)
+				.send({ nome: nomeEditora })
 				.expect(HttpStatus.BAD_REQUEST)
 		})
 	})
 
 	describe("PUT /editoras", () => {
-		it("Deve atualizar uma Editora existente", async () => {
-			const novaEditora = criarEditoraPayload({ nome: "Editora Bookman" });
+		it("Teste 12: Deve atualizar uma Editora existente", async () => {
+			const novaEditora = criarEditoraPayload({ nome: "Editora Antiga" });
 			const createResponse = await criarEditoraNoBanco(app, novaEditora);
-
-			const editoraId = createResponse.body.id
-
-			const editoraAtualizada = {
-				id: editoraId,
-				nome: "Editora Bookman International"
-			}
+			
+			const editoraAtualizada = criarEditoraUpdatePayload(createResponse.id, {
+				nome: "Editora Antiga Renovada"
+			});
 
 			const response = await request(app.getHttpServer())
 				.put("/editoras")
 				.set("Authorization", "Bearer mock-token")
 				.send(editoraAtualizada)
-				.expect(HttpStatus.OK)
+				.expect(HttpStatus.OK);
 
-			expect(response.body.nome).toBe(editoraAtualizada.nome)
+			expect(response.body.data.nome).toBe(editoraAtualizada.nome);
 		})
 
-		it("Deve retornar erro ao atualizar Editora inexistente", async () => {
-			const editoraInexistente = {
-				id: 999,
-				nome: "Editora Inexistente"
-			}
+		it("Teste 13: Deve retornar erro ao atualizar Editora inexistente", async () => {
+			const editoraInexistente = criarEditoraUpdatePayload(999, {
+				nome: `Editora Inexistente ${Date.now()}`
+			});
 
 			await request(app.getHttpServer())
-				.put("/editoras/999")
+				.put("/editoras")
 				.set("Authorization", "Bearer mock-token")
 				.send(editoraInexistente)
-				.expect(HttpStatus.NOT_FOUND)
+				.expect(HttpStatus.NOT_FOUND);
+		})
+
+		it("Teste 14: Deve retornar erro ao atualizar Editora com nome duplicado", async () => {
+			await criarEditoraNoBanco(app, { nome: "Primeira Editora" });
+			const editora2 = await criarEditoraNoBanco(app, { nome: "Segunda Editora" });
+
+			const editoraAtualizada = {
+				id: editora2.id,
+				nome: "Primeira Editora" // Nome que já existe
+			};
+
+			await request(app.getHttpServer())
+				.put("/editoras")
+				.set("Authorization", "Bearer mock-token")
+				.send(editoraAtualizada)
+				.expect(HttpStatus.BAD_REQUEST);
 		})
 	})
 
 	describe("DELETE /editoras/:id", () => {
-		it("Deve deletar uma Editora existente", async () => {
-			const novaEditora = criarEditoraPayload({ nome: "Editora Paulus" });
+		it("Teste 15: Deve deletar uma Editora existente", async () => {
+			const novaEditora = criarEditoraPayload({ nome: "Editora Para Deletar" });
 			const createResponse = await criarEditoraNoBanco(app, novaEditora);
+			const editoraId = createResponse.id;
 
-			const editoraId = createResponse.body.id
+			// Verifica se a editora existe antes de deletar
+			const getResponse = await request(app.getHttpServer())
+				.get(`/editoras/${editoraId}`)
+				.set("Authorization", "Bearer mock-token");
+			if (getResponse.status !== 200) {
+				throw new Error(`Editora não existe antes do delete. Status: ${getResponse.status}`);
+			}
 
 			await request(app.getHttpServer())
 				.delete(`/editoras/${editoraId}`)
 				.set("Authorization", "Bearer mock-token")
-				.expect(HttpStatus.NO_CONTENT)
+				.expect(HttpStatus.NO_CONTENT);
 
 			await request(app.getHttpServer())
 				.get(`/editoras/${editoraId}`)
 				.set("Authorization", "Bearer mock-token")
-				.expect(HttpStatus.NOT_FOUND)
+				.expect(HttpStatus.NOT_FOUND);
 		})
 
-		it("Deve retornar erro ao deletar Editora inexistente", async () => {
+		it("Teste 16: Deve retornar erro ao deletar Editora inexistente", async () => {
 			await request(app.getHttpServer())
 				.delete("/editoras/999")
 				.set("Authorization", "Bearer mock-token")

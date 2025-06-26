@@ -1,5 +1,5 @@
 // Funções utilitárias para payloads e helpers de produto
-import { HttpStatus, INestApplication } from "@nestjs/common"
+import { INestApplication } from "@nestjs/common"
 import * as request from "supertest"
 import { CriarAutorDto } from "../../src/autor/dtos/criarautor.dto"
 import { AtualizarAutorDto } from "../../src/autor/dtos/atualizarautor.dto"
@@ -9,6 +9,10 @@ import { CriarEditoraDto } from "../../src/editora/dtos/criareditora.dto"
 import { AtualizarEditoraDto } from "../../src/editora/dtos/atualizareditora.dto"
 import { CriarProdutoDto } from "../../src/produto/dtos/criarproduto.dto"
 import { AtualizarProdutoDto } from "../../src/produto/dtos/atualizarproduto.dto"
+import { CriarUsuarioDto } from "../../src/usuario/dtos/criarusuario.dto"
+import { AtualizarUsuarioDto } from "../../src/usuario/dtos/atualizarusuario.dto"
+import { CriarRoleDto } from "../../src/role/dtos/criarrole.dto"
+import { AtualizarRoleDto } from "../../src/role/dtos/atualizarrole.dto"
 
 export function criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, overrides: Partial<CriarProdutoDto> = {}): CriarProdutoDto {
 	return {
@@ -68,11 +72,11 @@ export function criarProdutoUpdatePayload(testCategoria, testEditora, testAutor,
 
 export async function criarProdutoNoBanco(app: INestApplication, testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, payloadOverrides: Partial<CriarProdutoDto> = {}) {
 	const produtoPayload = criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, payloadOverrides);
-	return await request(app.getHttpServer())
+	const response = await request(app.getHttpServer())
 		.post("/produtos")
 		.set("Authorization", "Bearer mock-token")
-		.send(produtoPayload)
-		.expect(HttpStatus.CREATED);
+		.send(produtoPayload);
+	return response.body.data;
 }
 
 // --- Helpers para AUTOR ---
@@ -95,11 +99,11 @@ export function criarAutorUpdatePayload(id: number, overrides: Partial<Atualizar
 
 export async function criarAutorNoBanco(app: INestApplication, overrides: Partial<CriarAutorDto> = {}) {
 	const payload = criarAutorPayload(overrides);
-	return await request(app.getHttpServer())
+	const response = await request(app.getHttpServer())
 		.post('/autores')
 		.set('Authorization', 'Bearer mock-token')
-		.send(payload)
-		.expect(HttpStatus.CREATED);
+		.send(payload);
+	return response.body.data;
 }
 
 // --- Helpers para CATEGORIA ---
@@ -120,11 +124,11 @@ export function criarCategoriaUpdatePayload(id: number, overrides: Partial<Atual
 
 export async function criarCategoriaNoBanco(app: INestApplication, overrides: Partial<CriarCategoriaDto> = {}) {
 	const payload = criarCategoriaPayload(overrides);
-	return await request(app.getHttpServer())
+	const response = await request(app.getHttpServer())
 		.post('/categorias')
 		.set('Authorization', 'Bearer mock-token')
-		.send(payload)
-		.expect(HttpStatus.CREATED);
+		.send(payload);
+	return response.body.data;
 }
 
 // --- Helpers para EDITORA ---
@@ -145,9 +149,67 @@ export function criarEditoraUpdatePayload(id: number, overrides: Partial<Atualiz
 
 export async function criarEditoraNoBanco(app: INestApplication, overrides: Partial<CriarEditoraDto> = {}) {
 	const payload = criarEditoraPayload(overrides);
-	return await request(app.getHttpServer())
+	const response = await request(app.getHttpServer())
 		.post('/editoras')
 		.set('Authorization', 'Bearer mock-token')
-		.send(payload)
-		.expect(HttpStatus.CREATED);
+		.send(payload);
+	return response.body.data;
+}
+
+// --- Helpers para ROLE ---
+export function criarRolePayload(overrides: Partial<CriarRoleDto> = {}): CriarRoleDto {
+	return {
+		nome: 'ROLE_TESTE',
+		descricao: 'Role de teste para validação',
+		...overrides
+	};
+}
+
+export function criarRoleUpdatePayload(id: number, overrides: Partial<AtualizarRoleDto> = {}): AtualizarRoleDto {
+	return {
+		id,
+		nome: 'ROLE_TESTE_ATUALIZADA',
+		descricao: 'Role de teste atualizada',
+		...overrides
+	};
+}
+
+export async function criarRoleNoBanco(app: INestApplication, overrides: Partial<CriarRoleDto> = {}) {
+	const payload = criarRolePayload(overrides);
+	const response = await request(app.getHttpServer())
+		.post('/roles')
+		.set('Authorization', 'Bearer mock-token')
+		.send(payload);
+	return response.body.data;
+}
+
+// --- Helpers para USUARIO ---
+export function criarUsuarioPayload(overrides: Partial<CriarUsuarioDto> = {}): CriarUsuarioDto {
+	return {
+		nome: 'Usuário Teste',
+		usuario: overrides.usuario ?? `usuario${Date.now()}@teste.com`,
+		senha: 'SenhaForte123!',
+		roles: overrides.roles ?? [{ id: 1 }],
+		...overrides
+	};
+}
+
+export function criarUsuarioUpdatePayload(id: number, overrides: Partial<Omit<CriarUsuarioDto, 'senha'>> = {}): AtualizarUsuarioDto {
+	return {
+		id,
+		nome: overrides.nome,
+		usuario: overrides.usuario,
+		senha: 'SenhaForte123!',
+		roles: [{ id: 1 }],
+		...overrides
+	};
+}
+
+export async function criarUsuarioNoBanco(app: INestApplication, overrides: Partial<CriarUsuarioDto> = {}) {
+	const payload = criarUsuarioPayload(overrides);
+	const response = await request(app.getHttpServer())
+		.post('/usuarios/cadastrar')
+		.set('Authorization', 'Bearer mock-token')
+		.send(payload);
+	return response.body.data;
 } 

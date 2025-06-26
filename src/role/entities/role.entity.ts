@@ -1,10 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, CreateDateColumn, UpdateDateColumn } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, CreateDateColumn, UpdateDateColumn, Index } from "typeorm"
 import { Usuario } from "../../usuario/entities/usuario.entity"
 import { ApiProperty } from "@nestjs/swagger"
 import { Transform, TransformFnParams } from "class-transformer"
 import { IsNotEmpty, Length, IsString } from "class-validator"
 
 @Entity("tb_roles")
+@Index('IDX_ROLE_NOME', ['nome'])
 export class Role {
 	@ApiProperty({ description: 'ID da role' })
 	@PrimaryGeneratedColumn()
@@ -18,7 +19,7 @@ export class Role {
 	@IsNotEmpty({ message: 'Nome da role é obrigatório' })
 	@IsString({ message: 'Nome deve ser uma string' })
 	@Length(2, 50, { message: 'Nome deve ter entre 2 e 50 caracteres' })
-	@Column({ length: 255, nullable: false, unique: true })
+	@Column({ length: 50, nullable: false, unique: true })
 	nome: string
 
 	@ApiProperty({ 

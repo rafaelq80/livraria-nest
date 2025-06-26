@@ -1,10 +1,9 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Put, UseGuards } from "@nestjs/common";
-import { Autor } from "../entities/autor.entity";
-import { AutorService } from "../services/autor.service";
+import { ApiBearerAuth, ApiBody, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../security/guards/jwt-auth.guard";
-import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { AtualizarAutorDto } from "../dtos/atualizarautor.dto";
 import { CriarAutorDto } from "../dtos/criarautor.dto";
+import { AutorService } from "../services/autor.service";
 
 @ApiTags('Autor')
 @ApiBearerAuth()
@@ -16,40 +15,153 @@ export class AutorController{
 
     @Get()
     @HttpCode(HttpStatus.OK)
-    findAll(): Promise<Autor[]>{
-        return this.autorService.findAll();
+    @ApiResponse({
+        status: 200,
+        description: 'Autores encontrados.',
+        schema: {
+            example: {
+                status: 'success',
+                message: 'Autores encontrados.',
+                data: [
+                    {
+                        id: 1,
+                        nome: 'João Silva',
+                        nacionalidade: 'Brasileira',
+                        createdAt: '2024-01-01T00:00:00.000Z',
+                        updatedAt: '2024-01-01T00:00:00.000Z'
+                    }
+                ]
+            }
+        }
+    })
+    async findAll() {
+        const autores = await this.autorService.findAll();
+        return {
+            status: 'success',
+            message: 'Autores encontrados.',
+            data: autores
+        };
     }
 
     @Get('/:id')
     @HttpCode(HttpStatus.OK)
-    findById(@Param('id', ParseIntPipe) id: number): Promise<Autor>{
-        return this.autorService.findById(id);
+    @ApiResponse({
+        status: 200,
+        description: 'Autor encontrado.',
+        schema: {
+            example: {
+                status: 'success',
+                message: 'Autor encontrado.',
+                data: {
+                    id: 1,
+                    nome: 'João Silva',
+                    nacionalidade: 'Brasileira',
+                    createdAt: '2024-01-01T00:00:00.000Z',
+                    updatedAt: '2024-01-01T00:00:00.000Z'
+                }
+            }
+        }
+    })
+    async findById(@Param('id', ParseIntPipe) id: number) {
+        const autor = await this.autorService.findById(id);
+        return {
+            status: 'success',
+            message: 'Autor encontrado.',
+            data: autor
+        };
     }
 
     @Get('/nome/:nome')
     @HttpCode(HttpStatus.OK)
-    findByNome(@Param('nome') nome: string): Promise<Autor[]>{
-        return this.autorService.findAllByNome(nome);
+    @ApiResponse({
+        status: 200,
+        description: 'Autores encontrados por nome.',
+        schema: {
+            example: {
+                status: 'success',
+                message: 'Autores encontrados por nome.',
+                data: [
+                    {
+                        id: 1,
+                        nome: 'João Silva',
+                        nacionalidade: 'Brasileira',
+                        createdAt: '2024-01-01T00:00:00.000Z',
+                        updatedAt: '2024-01-01T00:00:00.000Z'
+                    }
+                ]
+            }
+        }
+    })
+    async findByNome(@Param('nome') nome: string) {
+        const autores = await this.autorService.findAllByNome(nome);
+        return {
+            status: 'success',
+            message: 'Autores encontrados por nome.',
+            data: autores
+        };
     }
 
     @Post() 
     @HttpCode(HttpStatus.CREATED)
     @ApiBody({ type: CriarAutorDto })
-    create(@Body() autorDto: CriarAutorDto): Promise<Autor> {
-        return this.autorService.create(autorDto);
+    @ApiResponse({
+        status: 201,
+        description: 'Autor criado com sucesso.',
+        schema: {
+            example: {
+                status: 'success',
+                message: 'Autor criado com sucesso.',
+                data: {
+                    id: 1,
+                    nome: 'João Silva',
+                    nacionalidade: 'Brasileira',
+                    createdAt: '2024-01-01T00:00:00.000Z',
+                    updatedAt: '2024-01-01T00:00:00.000Z'
+                }
+            }
+        }
+    })
+    async create(@Body() autorDto: CriarAutorDto) {
+        const autor = await this.autorService.create(autorDto);
+        return {
+            status: 'success',
+            message: 'Autor criado com sucesso.',
+            data: autor
+        };
     }
 
     @Put() 
     @HttpCode(HttpStatus.OK)
     @ApiBody({ type: AtualizarAutorDto })
-    update(@Body() autorDto: AtualizarAutorDto): Promise<Autor> {
-        return this.autorService.update(autorDto);
+    @ApiResponse({
+        status: 200,
+        description: 'Autor atualizado com sucesso.',
+        schema: {
+            example: {
+                status: 'success',
+                message: 'Autor atualizado com sucesso.',
+                data: {
+                    id: 1,
+                    nome: 'João Silva',
+                    nacionalidade: 'Brasileira',
+                    createdAt: '2024-01-01T00:00:00.000Z',
+                    updatedAt: '2024-01-01T00:00:00.000Z'
+                }
+            }
+        }
+    })
+    async update(@Body() autorDto: AtualizarAutorDto) {
+        const autor = await this.autorService.update(autorDto);
+        return {
+            status: 'success',
+            message: 'Autor atualizado com sucesso.',
+            data: autor
+        };
     }
 
     @Delete('/:id')
     @HttpCode(HttpStatus.NO_CONTENT)
-    delete(@Param('id', ParseIntPipe) id: number){
-        return this.autorService.delete(id);
+    async delete(@Param('id', ParseIntPipe) id: number) {
+        await this.autorService.delete(id);
     }
-    
 }

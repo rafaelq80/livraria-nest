@@ -128,21 +128,6 @@ export class UsuarioService {
 	): Promise<Usuario> {
 		this.logger.log("=== INICIANDO ATUALIZAÇÃO DE USUÁRIO ===")
 		this.logger.log("DTO recebido: " + JSON.stringify(usuarioDto, null, 2))
-		this.logger.log(
-			"Arquivo de foto: " +
-				(fotoFile
-					? JSON.stringify(
-							{
-								fieldname: fotoFile.fieldname,
-								originalname: fotoFile.originalname,
-								mimetype: fotoFile.mimetype,
-								size: fotoFile.size,
-							},
-							null,
-							2,
-						)
-					: "null"),
-		)
 
 		if (!usuarioDto?.id) {
 			throw new BadRequestException(ErrorMessages.USER.INVALID_ID)
@@ -179,13 +164,14 @@ export class UsuarioService {
 		// Atualizar roles se fornecidas
 		if (roles !== undefined) {
 			const rolesParaAssociar = await this.obterRolesOuPadrao(roles)
-			usuarioAtual.roles = rolesParaAssociar
-			await this.usuarioRepository.save(usuarioAtual)
+			await this.usuarioRepository
+				.createQueryBuilder()
+				.relation(Usuario, "roles")
+				.of(usuarioDto.id)
+				.addAndRemove(rolesParaAssociar, usuarioAtual.roles)
 		}
 
 		const usuarioPersistido = await this.findById(usuarioDto.id)
-		this.logger.log("Usuario atualizado: " + JSON.stringify(usuarioPersistido, null, 2))
-
 		this.logger.log("=== ATUALIZAÇÃO DE USUÁRIO CONCLUÍDA ===")
 		return usuarioPersistido
 	}

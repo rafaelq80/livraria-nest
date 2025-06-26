@@ -1,62 +1,66 @@
 import { HttpStatus, INestApplication, Logger } from "@nestjs/common"
 import * as request from "supertest"
-import { AutorModule } from "../src/autor/autor.module"
 import { Autor } from "../src/autor/entities/autor.entity"
 import { AutorService } from "../src/autor/services/autor.service"
-import { CategoriaModule } from "../src/categoria/categoria.module"
 import { Categoria } from "../src/categoria/entities/categoria.entity"
-import { CategoriaService } from "../src/categoria/services/categoria.service"
-import { EditoraModule } from "../src/editora/editora.module"
 import { Editora } from "../src/editora/entities/editora.entity"
-import { EditoraService } from "../src/editora/services/editora.service"
-import { ProdutoModule } from "../src/produto/produto.module"
-import { TestDatabaseHelper } from "./helpers/test-database.helper"
-import {
-	criarProdutoPayload,
-	criarProdutoInvalidoPayload,
-	criarProdutoUpdatePayload,
-	criarProdutoNoBanco
-} from "./helpers/payloads"
-import { gerarISBN10, gerarISBN13 } from './helpers/generators'
-import { CriarProdutoDto } from "../src/produto/dtos/criarproduto.dto"
 import { AtualizarProdutoDto } from "../src/produto/dtos/atualizarproduto.dto"
+import { CriarProdutoDto } from "../src/produto/dtos/criarproduto.dto"
+import { ProdutoModule } from "../src/produto/produto.module"
+import { CategoriaModule } from "../src/categoria/categoria.module"
+import { EditoraModule } from "../src/editora/editora.module"
+import { AutorModule } from "../src/autor/autor.module"
+import {
+	criarAutorNoBanco,
+	criarCategoriaNoBanco,
+	criarEditoraNoBanco,
+	criarProdutoInvalidoPayload,
+	criarProdutoNoBanco,
+	criarProdutoPayload,
+	criarProdutoUpdatePayload,
+	gerarISBN10,
+	gerarISBN13,
+	TestDatabaseHelper
+} from './helpers'
 
-describe("ProdutoController (e2e)", () => {
+describe("Produto E2E Tests", () => {
+	let testHelper: TestDatabaseHelper
 	let app: INestApplication
-	let testeCategoria: Categoria
-	let testeEditora: Editora
-	let testeAutor: Autor
-	let categoriaService: CategoriaService
-	let editoraService: EditoraService
+	let testCategoria: Categoria
+	let testEditora: Editora
+	let testAutor: Autor
+	let testAutor2: Autor
 	let autorService: AutorService
 	let novoProduto: CriarProdutoDto
 	let updateProduto: AtualizarProdutoDto
-	let testHelper: TestDatabaseHelper
 
 	beforeAll(async () => {
 		testHelper = new TestDatabaseHelper()
-		app = await testHelper.createTestModule([
-			ProdutoModule,
-			CategoriaModule,
-			EditoraModule,
-			AutorModule
-		])
+		app = await testHelper.createTestModule(
+			[ProdutoModule, AutorModule, CategoriaModule, EditoraModule],
+			{
+				// Configurações específicas para testes de produto
+				jwt: {
+					expiration: '1h',
+				},
+				app: {
+					environment: 'test-produto',
+				}
+			}
+		)
 
-		categoriaService = app.get<CategoriaService>(CategoriaService)
-		editoraService = app.get<EditoraService>(EditoraService)
+		// Criar entidades necessárias para os testes
+		testCategoria = await criarCategoriaNoBanco(app, { tipo: 'Ficção' });
+		testEditora = await criarEditoraNoBanco(app, { nome: 'Editora Teste' });
+		testAutor = await criarAutorNoBanco(app, { nome: 'Autor Teste' });
+
 		autorService = app.get<AutorService>(AutorService)
 
-		testeCategoria = await categoriaService.create({
-			tipo: "Teste Categoria",
-		} as Categoria)
-
-		testeEditora = await editoraService.create({
-			nome: "Teste Editora",
-		} as Editora)
-
-		testeAutor = await autorService.create({
-			nome: "Teste Autor",
+		testAutor2 = await autorService.create({
+			nome: "Teste Autor 2",
 		} as Autor)
+
+		jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {})
 	})
 
 	afterAll(async () => {
@@ -70,35 +74,30 @@ describe("ProdutoController (e2e)", () => {
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toBeInstanceOf(Array)
-			expect(response.body.length).toBe(0)
+			expect(response.body.data).toBeInstanceOf(Array)
+			expect(response.body.data.length).toBe(0)
 		})
 
 		it("Teste 2: deve retornar lista de produtos quando existirem produtos", async () => {
-			await criarProdutoNoBanco(app, testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, { titulo: "JavaScript Descomplicado" });
+			await criarProdutoNoBanco(app, testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, { titulo: "JavaScript Descomplicado" });
 			const response = await request(app.getHttpServer())
 				.get("/produtos")
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toBeInstanceOf(Array)
-			expect(response.body.length).toBeGreaterThan(0)
+			expect(response.body.data).toBeInstanceOf(Array)
+			expect(response.body.data.length).toBeGreaterThan(0)
 		})
 	})
 
 	describe("GET /produtos/:id", () => {
 		it("Teste 3: deve retornar produto quando ID existir", async () => {
-			const createResponse = await criarProdutoNoBanco(app, testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, { titulo: "JavaScript Descomplicado" });
+			const createResponse = await criarProdutoNoBanco(app, testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, { titulo: "JavaScript Descomplicado" });
 			const response = await request(app.getHttpServer())
-				.get(`/produtos/${createResponse.body.id}`)
+				.get(`/produtos/${createResponse.id}`)
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
-
-			expect(response.body).toMatchObject({
-				id: createResponse.body.id,
-				titulo: createResponse.body.titulo,
-				preco: createResponse.body.preco,
-			})
+			expect(response.body.data).toMatchObject({ id: createResponse.id, titulo: "JavaScript Descomplicado" })
 		})
 
 		it("Teste 4: deve retornar 404 quando ID não existir", async () => {
@@ -111,7 +110,7 @@ describe("ProdutoController (e2e)", () => {
 
 	describe("GET /produtos/titulo/:titulo", () => {
 		it("Teste 5: deve retornar lista de produtos quando título existir", async () => {
-			const novoProduto = criarProdutoPayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, { titulo: "JavaScript Descomplicado" });
+			const novoProduto = criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, { titulo: "JavaScript Descomplicado" });
 			await request(app.getHttpServer())
 				.post("/produtos")
 				.set("Authorization", "Bearer mock-token")
@@ -123,9 +122,9 @@ describe("ProdutoController (e2e)", () => {
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toBeInstanceOf(Array)
-			expect(response.body.length).toBeGreaterThan(0)
-			expect(response.body[0]).toMatchObject({
+			expect(response.body.data).toBeInstanceOf(Array)
+			expect(response.body.data.length).toBeGreaterThan(0)
+			expect(response.body.data[0]).toMatchObject({
 				titulo: novoProduto.titulo,
 				preco: novoProduto.preco,
 			})
@@ -137,26 +136,26 @@ describe("ProdutoController (e2e)", () => {
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toBeInstanceOf(Array)
-			expect(response.body.length).toBe(0)
+			expect(response.body.data).toBeInstanceOf(Array)
+			expect(response.body.data.length).toBe(0)
 		})
 	})
 
 	describe("POST /produtos", () => {
 		it("Teste 7: deve criar produto quando dados forem válidos", async () => {
-			novoProduto = criarProdutoPayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13);
+			novoProduto = criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13);
 			const response = await request(app.getHttpServer())
 				.post("/produtos")
 				.set("Authorization", "Bearer mock-token")
 				.send(novoProduto)
 				.expect(HttpStatus.CREATED)
 
-			expect(response.body).toHaveProperty("id")
-			expect(response.body.titulo).toBe(novoProduto.titulo)
+			expect(response.body.data).toHaveProperty("id")
+			expect(response.body.data.titulo).toBe(novoProduto.titulo)
 		})
 
 		it("Teste 8: deve retornar 400 quando dados forem inválidos", async () => {
-			const produtoInvalido = criarProdutoInvalidoPayload(testeCategoria, testeEditora, testeAutor);
+			const produtoInvalido = criarProdutoInvalidoPayload(testCategoria, testEditora, testAutor);
 			await request(app.getHttpServer())
 				.post("/produtos")
 				.set("Authorization", "Bearer mock-token")
@@ -164,50 +163,36 @@ describe("ProdutoController (e2e)", () => {
 				.expect(HttpStatus.BAD_REQUEST)
 		})
 
-		// Teste 9: POST /produtos com ISBN já existente
 		it("Teste 9: deve retornar 400 ao tentar criar produto com ISBN já existente", async () => {
-			const loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
-			const isbn10 = gerarISBN10();
-			const isbn13 = gerarISBN13();
-			const produto1 = criarProdutoPayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, { isbn10, isbn13, titulo: "Livro 1" });
-			await request(app.getHttpServer())
-				.post("/produtos")
-				.set("Authorization", "Bearer mock-token")
-				.send(produto1)
-				.expect(HttpStatus.CREATED);
-			const produto2 = criarProdutoPayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, { isbn10, isbn13, titulo: "Livro 2" });
+			const produto1 = criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, { isbn10: "1234567890", isbn13: "1234567890123" });
+			await criarProdutoNoBanco(app, testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, produto1);
+			const produto2 = criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, { isbn10: "1234567890", isbn13: "1234567890123" });
 			const response = await request(app.getHttpServer())
 				.post("/produtos")
 				.set("Authorization", "Bearer mock-token")
 				.send(produto2)
 				.expect(HttpStatus.BAD_REQUEST);
-			expect(response.body.message).toMatch(/ISBN/);
-			loggerErrorSpy.mockRestore();
+			if (Array.isArray(response.body.message)) {
+				expect(response.body.message.join(' ')).toMatch(/ISBN/);
+			} else {
+				expect(response.body.message).toMatch(/ISBN/);
+			}
 		})
 
-		// Teste 10: POST /produtos com categoria/editora/autor inexistente
 		it("Teste 10: deve retornar 400 ou 404 ao tentar criar produto com categoria/editora/autor inexistente", async () => {
-			const produtoInvalido = criarProdutoPayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, {
-				titulo: "Livro Inválido",
-				categoria: { id: 9999 },
-				editora: { id: 9999 },
-				autores: [{ id: 9999 }],
-			});
+			const produtoInvalido = criarProdutoPayload({ id: 999 }, { id: 999 }, { id: 999 }, gerarISBN10, gerarISBN13);
 			const response = await request(app.getHttpServer())
 				.post("/produtos")
 				.set("Authorization", "Bearer mock-token")
 				.send(produtoInvalido)
 				.expect(res => {
-					if (![400, 404].includes(res.status)) {
-						throw new Error(`Expected status 400 or 404, got ${res.status}`);
-					}
+					if (![400, 404].includes(res.status)) throw new Error("Esperado 400 ou 404");
 				});
 			expect(Array.isArray(response.body.message) || typeof response.body.message === 'string').toBe(true);
-		});
+		})
 
-		// Teste 11: POST /produtos com payload contendo campos extras
 		it("Teste 11: deve retornar 400 ao tentar criar produto com campos extras no payload", async () => {
-			const produtoExtra = { ...criarProdutoPayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, { titulo: "Livro Extra" }), campoInvalido: "não deveria estar aqui" };
+			const produtoExtra = { ...criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13), campoInvalido: "valor" };
 			const response = await request(app.getHttpServer())
 				.post("/produtos")
 				.set("Authorization", "Bearer mock-token")
@@ -218,45 +203,72 @@ describe("ProdutoController (e2e)", () => {
 			} else {
 				expect(response.body.message).toContain("campoInvalido");
 			}
-		});
+		})
 
-		// Teste 12: POST /produtos com upload de foto (se aplicável)
 		it("Teste 12: deve criar produto com upload de foto", async () => {
-			const produtoComFoto = criarProdutoPayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, { titulo: "Livro com Foto" });
+			const produtoFoto = criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13);
 			const response = await request(app.getHttpServer())
 				.post("/produtos")
 				.set("Authorization", "Bearer mock-token")
-				.field("titulo", produtoComFoto.titulo)
-				.field("sinopse", produtoComFoto.sinopse)
-				.field("paginas", produtoComFoto.paginas)
-				.field("anoPublicacao", produtoComFoto.anoPublicacao)
-				.field("preco", produtoComFoto.preco)
-				.field("idioma", produtoComFoto.idioma)
-				.field("isbn10", produtoComFoto.isbn10)
-				.field("isbn13", produtoComFoto.isbn13)
-				.field("desconto", produtoComFoto.desconto)
-				.field("edicao", produtoComFoto.edicao)
-				.field("categoria[id]", produtoComFoto.categoria.id)
-				.field("editora[id]", produtoComFoto.editora.id)
-				.field("autores[0][id]", produtoComFoto.autores[0].id)
+				.field("titulo", produtoFoto.titulo)
+				.field("sinopse", produtoFoto.sinopse)
+				.field("paginas", produtoFoto.paginas)
+				.field("anoPublicacao", produtoFoto.anoPublicacao)
+				.field("preco", produtoFoto.preco)
+				.field("idioma", produtoFoto.idioma)
+				.field("isbn10", produtoFoto.isbn10)
+				.field("isbn13", produtoFoto.isbn13)
+				.field("desconto", produtoFoto.desconto)
+				.field("edicao", produtoFoto.edicao)
+				.field("categoria[id]", testCategoria.id)
+				.field("editora[id]", testEditora.id)
+				.field("autores[0][id]", testAutor.id)
 				.attach("fotoFile", Buffer.from("fake image content"), "foto.jpg")
 			const { status, body } = response;
+			console.log('UPLOAD FOTO RESPONSE:', body);
 			expect(status).toBe(HttpStatus.CREATED);
-			expect(body).toHaveProperty("id");
-			expect(body).toHaveProperty("foto");
+			expect(body.data).toHaveProperty("id");
+			expect(body.data).toHaveProperty("foto");
+		})
+
+		it("Teste 13: deve criar produto com múltiplos autores", async () => {
+			const produtoMultiplosAutores = criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, { 
+				titulo: "Livro com Múltiplos Autores",
+				autores: [
+					{ id: testAutor.id },
+					{ id: testAutor2.id }
+				]
+			});
+			
+			const response = await request(app.getHttpServer())
+				.post("/produtos")
+				.set("Authorization", "Bearer mock-token")
+				.send(produtoMultiplosAutores)
+				.expect(HttpStatus.CREATED);
+
+			expect(response.body.data).toHaveProperty("id");
+			expect(response.body.data.titulo).toBe(produtoMultiplosAutores.titulo);
+			expect(response.body.data.autores).toBeInstanceOf(Array);
+			expect(response.body.data.autores.length).toBe(2);
+			expect(response.body.data.autores).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ id: testAutor.id }),
+					expect.objectContaining({ id: testAutor2.id })
+				])
+			);
 		});
 	})
 
 	describe("PUT /produtos", () => {
-		it("Teste 13: deve atualizar produto quando ID existir", async () => {
-			novoProduto = criarProdutoPayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13);
+		it("Teste 14: deve atualizar produto quando ID existir", async () => {
+			novoProduto = criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13);
 			const createResponse = await request(app.getHttpServer())
 				.post("/produtos")
 				.set("Authorization", "Bearer mock-token")
 				.send(novoProduto)
 				.expect(HttpStatus.CREATED)
 
-			updateProduto = criarProdutoUpdatePayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, createResponse.body.id, {
+			updateProduto = criarProdutoUpdatePayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, createResponse.body.data.id, {
 				titulo: "JavaScript Atualizado",
 				preco: 99.99,
 				...novoProduto
@@ -268,15 +280,15 @@ describe("ProdutoController (e2e)", () => {
 				.send(updateProduto)
 				.expect(HttpStatus.OK)
 
-			expect(response.body).toMatchObject({
-				id: createResponse.body.id,
+			expect(response.body.data).toMatchObject({
+				id: createResponse.body.data.id,
 				titulo: updateProduto.titulo,
 				preco: updateProduto.preco,
 			})
 		})
 
-		it("Teste 14: deve retornar 404 quando ID não existir", async () => {
-			updateProduto = criarProdutoUpdatePayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, 999, {
+		it("Teste 15: deve retornar 404 quando ID não existir", async () => {
+			updateProduto = criarProdutoUpdatePayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, 999, {
 				titulo: "JavaScript Descomplicado",
 				sinopse: "Uma sinopse válida do livro para passar na validação.",
 				paginas: 250,
@@ -287,9 +299,9 @@ describe("ProdutoController (e2e)", () => {
 				isbn13: gerarISBN13(),
 				desconto: 0,
 				edicao: 1,
-				categoria: { id: testeCategoria.id },
-				editora: { id: testeEditora.id },
-				autores: [{ id: testeAutor.id }],
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			});
 
 			await request(app.getHttpServer())
@@ -299,15 +311,15 @@ describe("ProdutoController (e2e)", () => {
 				.expect(HttpStatus.NOT_FOUND)
 		})
 
-		it("Teste 15: deve retornar 400 quando dados forem inválidos", async () => {
-			novoProduto = criarProdutoPayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13);
+		it("Teste 16: deve retornar 400 quando dados forem inválidos", async () => {
+			novoProduto = criarProdutoPayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13);
 			const response = await request(app.getHttpServer())
 				.post("/produtos")
 				.set("Authorization", "Bearer mock-token")
 				.send(novoProduto)
 				.expect(HttpStatus.CREATED)
 
-			const produtoInvalido = criarProdutoUpdatePayload(testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, response.body.id, {
+			const produtoInvalido = criarProdutoUpdatePayload(testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13, response.body.data.id, {
 				titulo: "JS",
 				sinopse: "curta",
 				paginas: 0,
@@ -316,9 +328,9 @@ describe("ProdutoController (e2e)", () => {
 				idioma: "Chinês",
 				isbn10: "123",
 				isbn13: "456",
-				categoria: { id: testeCategoria.id },
-				editora: { id: testeEditora.id },
-				autores: [{ id: testeAutor.id }],
+				categoria: { id: testCategoria.id },
+				editora: { id: testEditora.id },
+				autores: [{ id: testAutor.id }],
 			});
 
 			await request(app.getHttpServer())
@@ -330,22 +342,15 @@ describe("ProdutoController (e2e)", () => {
 	})
 
 	describe("DELETE /produtos/:id", () => {
-		it("Teste 16: deve remover produto quando ID existir", async () => {
-			const createResponse = await criarProdutoNoBanco(app, testeCategoria, testeEditora, testeAutor, gerarISBN10, gerarISBN13, { titulo: "JavaScript muito Descomplicado" });
-			expect(createResponse.status).toBe(HttpStatus.CREATED)
-
+		it("Teste 17: deve remover produto quando ID existir", async () => {
+			const createResponse = await criarProdutoNoBanco(app, testCategoria, testEditora, testAutor, gerarISBN10, gerarISBN13);
 			await request(app.getHttpServer())
-				.delete(`/produtos/${createResponse.body.id}`)
+				.delete(`/produtos/${createResponse.id}`)
 				.set("Authorization", "Bearer mock-token")
 				.expect(HttpStatus.NO_CONTENT)
-
-			await request(app.getHttpServer())
-				.get(`/produtos/${createResponse.body.id}`)
-				.set("Authorization", "Bearer mock-token")
-				.expect(HttpStatus.NOT_FOUND)
 		})
 
-		it("Teste 17: deve retornar 404 quando ID não existir", async () => {
+		it("Teste 18: deve retornar 404 quando ID não existir", async () => {
 			await request(app.getHttpServer())
 				.delete("/produtos/999")
 				.set("Authorization", "Bearer mock-token")

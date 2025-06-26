@@ -45,7 +45,9 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
 	): Promise<void> {
 		try {
 			this.logger.log(`🔍 Validando usuário Google: ${profile.id}`)
-			
+			this.logger.debug(`AccessToken recebido: ${accessToken}`)
+			this.logger.debug(`Profile recebido: ${JSON.stringify(profile)}`)
+
 			const { id, displayName, emails, photos } = profile as GoogleProfile
 
 			if (!emails || emails.length === 0) {
@@ -74,6 +76,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
 				novoUsuario.googleId = id
 				novoUsuario.roles = await this.getDefaultRoles()
 
+				this.logger.debug(`Novo usuário a ser criado: ${JSON.stringify(novoUsuario)}`)
 				usuario = await this.usuarioService.create(novoUsuario, null)
 				this.logger.log(`✅ Usuário criado com sucesso: ${usuario.id}`)
 			} else {
@@ -117,7 +120,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
 			this.logger.log(`✅ Usuário Google validado com sucesso: ${usuario.id}`)
 			done(null, usuarioValidado)
 		} catch (error) {
-			this.logger.error(`❌ Erro na validação Google para ${profile.id}:`, error.message)
+			this.logger.error(`❌ Erro na validação Google para ${profile?.id}:`, error?.message, error)
+			this.logger.error(`Stack: ${error?.stack}`)
 			done(error, false)
 		}
 	}
