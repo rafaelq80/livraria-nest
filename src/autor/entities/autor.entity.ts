@@ -38,7 +38,6 @@ export class Autor {
   @Transform(({ value }: TransformFnParams) => value?.trim())
   @IsOptional()
   @IsString({ message: 'Nacionalidade deve ser uma string' })
-  @Length(2, 100, { message: 'Nacionalidade deve ter entre 2 e 100 caracteres' })
   @Column({ length: 100, nullable: true })
   nacionalidade?: string;
 
