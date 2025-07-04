@@ -18,6 +18,5 @@ export class CriarAutorDto {
 	})
 	@IsOptional()
 	@IsString({ message: 'Nacionalidade deve ser uma string' })
-	@Length(2, 100, { message: 'Nacionalidade deve ter entre 2 e 100 caracteres' })
 	nacionalidade?: string;
 } 
