@@ -1,7 +1,7 @@
 ﻿import { Module } from "@nestjs/common"
 import { ConfigModule, ConfigService } from "@nestjs/config"
-import { Reflector } from "@nestjs/core";
-import { JwtModule } from "@nestjs/jwt"
+import { Reflector } from "@nestjs/core"
+import { JwtModule, JwtModuleOptions } from "@nestjs/jwt"
 import { PassportModule } from "@nestjs/passport"
 import { RoleModule } from "../role/role.module"
 import { SendmailModule } from "../sendmail/sendmail.module"
@@ -13,7 +13,7 @@ import { SecurityService } from "./services/security.service"
 import { GoogleStrategy } from "./strategies/google.strategy"
 import { JwtStrategy } from "./strategies/jwt.strategy"
 import { LocalStrategy } from "./strategies/local.strategy"
-import { GoogleController } from "./controllers/google.controller";
+import { GoogleController } from "./controllers/google.controller"
 
 @Module({
 	imports: [
@@ -23,12 +23,14 @@ import { GoogleController } from "./controllers/google.controller";
 		SendmailModule,
 		JwtModule.registerAsync({
 			imports: [ConfigModule],
-			useFactory: (configService: ConfigService) => ({
-				secret: configService.get<string>("jwt.secret"),
-				signOptions: {
-					expiresIn: configService.get<string>("jwt.expiration") || "1h",
-				},
-			}),
+			useFactory: (configService: ConfigService) => {
+				return {
+					secret: configService.get<string>("jwt.secret")!,
+					signOptions: {
+						expiresIn: configService.get<string>("jwt.expiration")!,
+					},
+				} as JwtModuleOptions
+			},
 			inject: [ConfigService],
 		}),
 	],

@@ -1,18 +1,18 @@
 export default () => ({
   port: parseInt(process.env.PORT, 10) || 4000,
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-secret-key',
-    expiration: process.env.JWT_EXPIRATION || '1h',
-    refreshExpiration: process.env.JWT_REFRESH_EXPIRATION || '7d',
-    algorithm: process.env.JWT_ALGORITHM || 'HS256',
+    secret: process.env.JWT_SECRET,
+    expiration: process.env.JWT_EXPIRATION,
+    refreshExpiration: process.env.JWT_REFRESH_EXPIRATION,
+    algorithm: process.env.JWT_ALGORITHM,
   },
   auth: {
-    usernameField: process.env.AUTH_USERNAME_FIELD || 'usuario',
-    passwordField: process.env.AUTH_PASSWORD_FIELD || 'senha',
+    usernameField: process.env.AUTH_USERNAME_FIELD,
+    passwordField: process.env.AUTH_PASSWORD_FIELD,
     bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS, 10) || 10,
     sessionEnabled: process.env.AUTH_SESSION_ENABLED === 'true',
     maxLoginAttempts: parseInt(process.env.AUTH_MAX_LOGIN_ATTEMPTS, 10) || 5,
-    lockoutDuration: parseInt(process.env.AUTH_LOCKOUT_DURATION, 10) || 15 * 60 * 1000, // 15 min
+    lockoutDuration: parseInt(process.env.AUTH_LOCKOUT_DURATION, 10) || 900000, 
   },
   cors: {
     origin: '*',
