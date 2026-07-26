@@ -29,131 +29,70 @@ export class ImageKitService {
 		this.deleteTimeout = this.configService.get<number>("imagekit.deleteTimeout")
 		this.compressionQuality = this.configService.get<number>("imagekit.compressionQuality")
 		
-		// Validar configuração na inicialização
 		this.validateConfiguration()
 	}
 
 	private validateConfiguration(): void {
-		if (!this.imageKitUrl) {
-			throw new Error("IMAGEKIT_URL_ENDPOINT não configurado")
-		}
-		if (!this.imageKitPrivateKey) {
-			throw new Error("IMAGEKIT_PRIVATE_KEY não configurado")
-		}
-		if (!this.imageKitDeleteUrl) {
-			throw new Error("IMAGEKIT_URL_DELETE não configurado")
+		if (!this.imageKitUrl || !this.imageKitPrivateKey || !this.imageKitDeleteUrl) {
+			throw new Error("Configuração do ImageKit incompleta")
 		}
 	}
 
 	async handleImage(imagekitDto: ImagekitDto | BaseImageUpload): Promise<string | undefined> {
 		if (!imagekitDto?.file) {
-			this.logger.warn("Nenhum arquivo fornecido para upload", {
-				recurso: imagekitDto?.recurso,
-				identificador: imagekitDto?.identificador
-			});
-			return undefined;
+			return undefined
 		}
 
 		try {
-			this.logger.log("Iniciando processamento de imagem", {
-				recurso: imagekitDto.recurso,
-				identificador: imagekitDto.identificador,
-				fileName: imagekitDto.file.originalname,
-				fileSize: imagekitDto.file.size,
-				hasOldImage: 'oldImageUrl' in imagekitDto && !!imagekitDto.oldImageUrl,
-			});
-
-			// Deletar imagem antiga se existir
+			// Deleta imagem antiga se existir
 			if ('oldImageUrl' in imagekitDto && imagekitDto.oldImageUrl) {
-				this.logger.log("Deletando imagem antiga", { oldImageUrl: imagekitDto.oldImageUrl });
-				await this.deleteOldImage(imagekitDto.oldImageUrl);
+				await this.deleteOldImage(imagekitDto.oldImageUrl)
 			}
 
-			const imageBuffer = await this.getImageBuffer(imagekitDto.file);
+			const imageBuffer = await this.getImageBuffer(imagekitDto.file)
 			if (!imageBuffer) {
-				this.logger.error("Não foi possível obter o buffer da imagem", {
-					fileName: imagekitDto.file.originalname,
-					fileSize: imagekitDto.file.size,
-					mimeType: imagekitDto.file.mimetype
-				});
-				return undefined;
+				throw new BadRequestException("Não foi possível processar o arquivo de imagem")
 			}
 
-			// Validar se recurso e identificador existem
 			if (!imagekitDto.recurso || !imagekitDto.identificador) {
-				this.logger.error("Recurso ou identificador não fornecidos", {
-					recurso: imagekitDto.recurso,
-					identificador: imagekitDto.identificador,
-					fileName: imagekitDto.file.originalname
-				});
-				return undefined;
+				throw new BadRequestException("Recurso ou identificador não fornecidos")
 			}
 
 			const file = this.createFileObject(
 				imageBuffer,
 				imagekitDto.recurso,
 				imagekitDto.identificador,
-			);
+				imagekitDto.file.mimetype,
+				imagekitDto.file.originalname,
+			)
 
-			this.logger.log("Arquivo criado com sucesso", {
-				fileName: file.filename,
-				bufferSize: file.size,
-				folder: `uploads/livraria/${imagekitDto.recurso}`
-			});
-
-			const result = await this.uploadImage(file, `uploads/livraria/${imagekitDto.recurso}`);
+			const result = await this.uploadImage(file, `uploads/livraria/${imagekitDto.recurso}`)
 			
-			this.logger.log("Upload concluído com sucesso", {
-				url: result,
-				recurso: imagekitDto.recurso,
-				identificador: imagekitDto.identificador
-			});
-
-			return result;
+			this.logger.log(`Upload concluído: ${imagekitDto.recurso}/${imagekitDto.identificador}`)
+			return result
 		} catch (error) {
-			this.logger.error("Erro ao processar imagem", {
-				error: error instanceof Error ? error.message : String(error),
-				stack: error instanceof Error ? error.stack : undefined,
-				recurso: imagekitDto.recurso,
-				identificador: imagekitDto.identificador,
-				fileName: imagekitDto.file?.originalname
-			});
-			throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED);
+			this.logger.error(`Erro ao processar imagem: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
+			throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
 		}
 	}
 
 	private async deleteOldImage(oldImageUrl?: string): Promise<void> {
 		if (!oldImageUrl || typeof oldImageUrl !== 'string') {
-			this.logger.debug("URL da imagem antiga inválida ou não fornecida", { oldImageUrl });
-			return;
+			return
 		}
 
 		try {
-			this.logger.log("Iniciando deleção de imagem antiga", { oldImageUrl });
-			
-			const imageName = oldImageUrl.split("/").pop();
-			if (!imageName) {
-				this.logger.warn("Não foi possível extrair o nome da imagem da URL", { oldImageUrl });
-				return;
-			}
+			const imageName = oldImageUrl.split("/").pop()
+			if (!imageName) return
 
-			this.logger.debug("Buscando ID da imagem para deleção", { imageName });
-			const imageId = await this.getImageId(imageName);
-			
+			const imageId = await this.getImageId(imageName)
 			if (imageId) {
-				this.logger.log("Deletando imagem antiga", { imageId, imageName });
-				await this.deleteImage(imageId);
-				this.logger.log("Imagem antiga deletada com sucesso", { imageId, imageName });
-			} else {
-				this.logger.warn("ID da imagem não encontrado, não foi possível deletar", { imageName, oldImageUrl });
+				await this.deleteImage(imageId)
+				this.logger.log(`Imagem antiga deletada: ${imageName}`)
 			}
 		} catch (error) {
-			this.logger.error("Erro ao deletar imagem antiga", {
-				error: error instanceof Error ? error.message : String(error),
-				oldImageUrl,
-				imageName: oldImageUrl.split("/").pop()
-			});
-			// Não propagar o erro, pois a falha em deletar a imagem antiga não deve impedir o upload da nova
+			this.logger.warn(`Erro ao deletar imagem antiga: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
+			// Não propaga erro - falha na deleção não deve bloquear o upload
 		}
 	}
 
@@ -167,10 +106,9 @@ export class ImageKitService {
 				return image.buffer
 			}
 			
-			this.logger.error("Formato de imagem inválido:", typeof image)
 			return undefined
 		} catch (error) {
-			this.logger.error("Erro ao obter buffer da imagem:", error)
+			this.logger.error(`Erro ao obter buffer: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
 			return undefined
 		}
 	}
@@ -179,20 +117,23 @@ export class ImageKitService {
 		buffer: Buffer,
 		recurso: string,
 		identificador: string,
+		originalMimeType: string = 'image/jpeg',
+		originalFileName?: string,
 	): Express.Multer.File {
 		if (!buffer || !recurso || !identificador) {
-			throw new Error("Parâmetros obrigatórios não fornecidos para criação do arquivo")
+			throw new Error("Parâmetros obrigatórios não fornecidos")
 		}
 
 		const timestamp = Date.now()
-		const filename = `${recurso}_${identificador}_${timestamp}.jpg`
+		const extension = this.getFileExtension(originalMimeType, originalFileName)
+		const filename = `${recurso}_${identificador}_${timestamp}.${extension}`
 		
 		return {
 			buffer,
 			originalname: filename,
 			fieldname: "file",
 			encoding: "7bit",
-			mimetype: "image/jpeg",
+			mimetype: originalMimeType,
 			size: buffer.length,
 			stream: null,
 			destination: "",
@@ -201,41 +142,80 @@ export class ImageKitService {
 		}
 	}
 
+	private getFileExtension(mimeType: string, originalFileName?: string): string {
+		// Tenta extrair extensão do nome original
+		if (originalFileName) {
+			const ext = originalFileName.split('.').pop()?.toLowerCase()
+			if (ext && ['jpg', 'jpeg', 'png', 'webp', 'avif', 'heic'].includes(ext)) {
+				return ext
+			}
+		}
+
+		// Mapeia MIME type para extensão
+		const mimeToExt: Record<string, string> = {
+			'image/jpeg': 'jpg',
+			'image/jpg': 'jpg',
+			'image/png': 'png',
+			'image/webp': 'webp',
+			'image/avif': 'avif',
+			'image/heic': 'heic',
+		}
+
+		return mimeToExt[mimeType] || 'jpg'
+	}
+
 	private async uploadImage(image: Express.Multer.File, folder: string): Promise<string> {
 		if (!image) {
 			throw new BadRequestException(ErrorMessages.IMAGE.NOT_PROVIDED)
 		}
 
-		// Validação robusta da imagem
-		const validationResult = await this.imageValidationService.validateImage(image)
-		if (!validationResult.isValid) {
-			throw new BadRequestException(
-				`Validação de imagem falhou: ${validationResult.errors.join(', ')}`
-			)
+		// Validação básica
+		const basicValidation = this.imageValidationService.validateImageBasic(image)
+		if (!basicValidation.isValid) {
+			throw new BadRequestException(`Validação falhou: ${basicValidation.errors.join(', ')}`)
 		}
 
-		this.logger.log(`Imagem validada: ${validationResult.width}x${validationResult.height}, ${validationResult.fileSize} bytes`)
+		let processedBuffer: Buffer
 
-		const processedBuffer = await this.processImage(image.buffer)
-		const form = this.createFormData(processedBuffer, image.originalname, folder)
+		// Formatos modernos: ImageKit processa
+		// Formatos tradicionais: Canvas processa
+		if (this.isModernImageFormat(image.mimetype)) {
+			this.logger.log(`Formato moderno detectado (${image.mimetype}): ImageKit processará`)
+			processedBuffer = image.buffer
+		} else {
+			this.logger.log(`Formato tradicional (${image.mimetype}): processando com Canvas`)
+			
+			const validationResult = await this.imageValidationService.validateImage(image)
+			if (!validationResult.isValid) {
+				throw new BadRequestException(`Validação falhou: ${validationResult.errors.join(', ')}`)
+			}
+
+			processedBuffer = await this.processImage(image.buffer)
+		}
+
+		const form = this.createFormData(processedBuffer, image.originalname, folder, image.mimetype)
 		return await this.postImage(form)
 	}
 
-	private createFormData(buffer: Buffer, filename: string, folder: string): FormData {
+	private isModernImageFormat(mimetype: string): boolean {
+		return ['image/webp', 'image/avif', 'image/heic', 'image/heif'].includes(mimetype)
+	}
+
+	private createFormData(buffer: Buffer, filename: string, folder: string, mimeType: string): FormData {
 		if (!buffer || buffer.length === 0) {
-			throw new Error("Buffer da imagem está vazio")
+			throw new Error("Buffer vazio")
 		}
 		
 		if (!filename) {
 			throw new Error("Nome do arquivo não fornecido")
 		}
 
-		// Convert Node.js Buffer to Uint8Array for Blob compatibility
-		const blob = new Blob([new Uint8Array(buffer)], { type: "image/jpeg" })
+		const blob = new Blob([new Uint8Array(buffer)], { type: mimeType })
 		const form = new FormData()
 		form.append("file", blob, filename)
 		form.append("fileName", filename)
 		form.append("folder", folder || "uploads/livraria/default")
+		
 		return form
 	}
 
@@ -252,41 +232,32 @@ export class ImageKitService {
 				throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
 			}
 
-			this.logger.log(`Upload realizado com sucesso: ${response.data.url}`)
 			return response.data.url
 		} catch (error) {
-			this.logger.error("Erro ao fazer upload da imagem:", error)
+			this.logger.error(`Erro no upload: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
 			throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
 		}
 	}
 
 	private async deleteImage(imageId: string): Promise<void> {
-		if (!imageId) {
-			this.logger.warn("ID da imagem não fornecido para deleção")
-			return
-		}
+		if (!imageId) return
 
 		const deleteUrl = `${this.imageKitDeleteUrl}/${imageId}`
 
 		try {
-			const response = await lastValueFrom(
+			await lastValueFrom(
 				this.httpService.delete(deleteUrl, {
 					headers: this.getAuthHeaders(),
 					timeout: this.deleteTimeout,
 				}),
 			)
-			this.logger.log("Imagem deletada com sucesso:", response.status, response.statusText)
 		} catch (error) {
-			this.logger.error("Erro ao deletar arquivo:", error.response?.data ?? error.message)
-			// Não propagar o erro para não interromper o fluxo principal
+			this.logger.error(`Erro ao deletar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
 		}
 	}
 
 	private async getImageId(imageName: string): Promise<string | null> {
-		if (!imageName) {
-			this.logger.warn("Nome da imagem não fornecido")
-			return null
-		}
+		if (!imageName) return null
 
 		const url = `${this.imageKitDeleteUrl}?name=${encodeURIComponent(imageName)}`
 
@@ -304,7 +275,7 @@ export class ImageKitService {
 
 			return null
 		} catch (error) {
-			this.logger.error("Erro ao buscar ID da imagem:", error)
+			this.logger.error(`Erro ao buscar ID: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
 			return null
 		}
 	}
@@ -321,7 +292,7 @@ export class ImageKitService {
 			ctx.drawImage(image, 0, 0)
 			return canvas.toBuffer("image/jpeg", { quality: this.compressionQuality })
 		} catch (error) {
-			this.logger.error("Erro ao processar imagem:", error)
+			this.logger.error(`Erro ao processar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
 			throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
 		}
 	}
@@ -344,27 +315,15 @@ export class ImageKitService {
 			}
 
 			return Buffer.from(response.data)
-		} catch (error: unknown) {
-			let errorMessage: string;
-			if (error instanceof Error) {
-				errorMessage = error.message;
-			} else if (typeof error === 'object' && error !== null) {
-				try {
-					errorMessage = JSON.stringify(error);
-				} catch {
-					errorMessage = '[Non-serializable error object]';
-				}
-			} else {
-				errorMessage = '[Unknown error type]';
-			}
-			this.logger.error("Erro ao baixar imagem:", errorMessage)
+		} catch (error) {
+			this.logger.error(`Erro ao baixar imagem: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
 			throw new BadRequestException(ErrorMessages.IMAGE.DOWNLOAD_ERROR)
 		}
 	}
 
 	private getAuthHeaders() {
 		if (!this.imageKitPrivateKey) {
-			throw new BadRequestException(ErrorMessages.IMAGE.INVALID_URL)
+			throw new BadRequestException("Chave privada do ImageKit não configurada")
 		}
 
 		const credentials = `${this.imageKitPrivateKey}:`
@@ -376,9 +335,8 @@ export class ImageKitService {
 		}
 	}
 
-	/**
-	 * Método utilitário para processar imagem de usuário
-	 */
+	// Métodos utilitários públicos
+
 	async processarUsuarioImage(
 		userId: number,
 		file: Express.Multer.File,
@@ -392,9 +350,6 @@ export class ImageKitService {
 		})
 	}
 
-	/**
-	 * Método utilitário para processar imagem de produto
-	 */
 	async processarProdutoImage(
 		productId: number,
 		file: Express.Multer.File,
@@ -408,9 +363,6 @@ export class ImageKitService {
 		})
 	}
 
-	/**
-	 * Método utilitário para processar imagem de autor
-	 */
 	async processarAutorImage(
 		authorId: number,
 		file: Express.Multer.File,
@@ -424,9 +376,6 @@ export class ImageKitService {
 		})
 	}
 
-	/**
-	 * Método utilitário para processar imagem de editora
-	 */
 	async processarEditoraImage(
 		publisherId: number,
 		file: Express.Multer.File,
@@ -440,24 +389,15 @@ export class ImageKitService {
 		})
 	}
 
-	/**
-	 * Método para deletar imagem por URL
-	 */
 	async deleteImageByUrl(imageUrl: string): Promise<void> {
 		if (!imageUrl) return
 		await this.deleteOldImage(imageUrl)
 	}
 
-	/**
-	 * Método para validar se uma URL é do ImageKit
-	 */
 	isImageKitUrl(url: string): boolean {
 		return !!(url && typeof url === 'string' && url.includes('imagekit.io'))
 	}
 
-	/**
-	 * Obtém configuração atual do ImageKit
-	 */
 	getConfig() {
 		return {
 			urlEndpoint: this.imageKitUrl,

@@ -39,7 +39,7 @@ export default () => ({
     urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT,
     urlDelete: process.env.IMAGEKIT_URL_DELETE,
     maxFileSize: parseInt(process.env.IMAGEKIT_MAX_FILE_SIZE, 10) || 5 * 1024 * 1024, // 5MB
-    allowedTypes: process.env.IMAGEKIT_ALLOWED_TYPES?.split(',') || ['image/jpeg', 'image/jpg', 'image/png'],
+    allowedTypes: process.env.IMAGEKIT_ALLOWED_TYPES?.split(',') || ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
     compressionQuality: parseFloat(process.env.IMAGEKIT_COMPRESSION_QUALITY) || 0.8,
     minWidth: parseInt(process.env.IMAGEKIT_MIN_WIDTH, 10) || 100,
     maxWidth: parseInt(process.env.IMAGEKIT_MAX_WIDTH, 10) || 4000,

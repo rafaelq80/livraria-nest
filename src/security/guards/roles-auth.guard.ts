@@ -27,8 +27,10 @@ export class RolesAuthGuard implements CanActivate {
       throw new HttpException(ErrorMessages.AUTH.USER_NOT_AUTHENTICATED, HttpStatus.UNAUTHORIZED);
     }
 
+    const userName = user.sub ?? user.email ?? user.usuario ?? user.id;
+
     if (!user.roles) {
-      this.logger.warn(`❌ Usuário ${user.usuario ?? user.id} sem roles tentando acessar recurso protegido`);
+      this.logger.warn(`❌ Usuário ${userName} sem roles tentando acessar recurso protegido`);
       throw new HttpException(ErrorMessages.AUTH.NO_ROLES, HttpStatus.FORBIDDEN);
     }
 
@@ -42,18 +44,18 @@ export class RolesAuthGuard implements CanActivate {
       : [];
 
     if (userRoleNames.length === 0) {
-      this.logger.warn(`❌ Usuário ${user.usuario ?? user.id} com roles inválidas`);
+      this.logger.warn(`❌ Usuário ${userName} com roles inválidas`);
       throw new HttpException(ErrorMessages.AUTH.NO_ROLES, HttpStatus.FORBIDDEN);
     }
 
     const hasRole = requiredRoles.some((role) => userRoleNames.includes(role));
 
     if (!hasRole) {
-      this.logger.warn(`❌ Usuário ${user.usuario ?? user.id} sem permissão. Roles necessárias: ${requiredRoles.join(', ')}. Roles do usuário: ${userRoleNames.join(', ')}`);
+      this.logger.warn(`❌ Usuário ${userName} sem permissão. Roles necessárias: ${requiredRoles.join(', ')}. Roles do usuário: ${userRoleNames.join(', ')}`);
       throw new HttpException(ErrorMessages.AUTH.INSUFFICIENT_PERMISSIONS, HttpStatus.FORBIDDEN);
     }
 
-    this.logger.log(`✅ Usuário ${user.usuario ?? user.id} autorizado com roles: ${userRoleNames.join(', ')}`);
+    this.logger.log(`✅ Usuário ${userName} autorizado com roles: ${userRoleNames.join(', ')}`);
     return true;
   }
 }

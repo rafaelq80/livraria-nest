@@ -34,7 +34,9 @@ export class ProdutoService {
 	}
 
 	async findById(id: number): Promise<Produto> {
-		if (id <= 0) throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
+		if (id <= 0) {
+			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
+		}
 
 		const produto = await this.produtoRepository.findOne({
 			where: { id },
@@ -45,7 +47,9 @@ export class ProdutoService {
 			},
 		})
 
-		if (!produto) throw new NotFoundException(ErrorMessages.PRODUTO.NOT_FOUND)
+		if (!produto) {
+			throw new NotFoundException(ErrorMessages.PRODUTO.NOT_FOUND)
+		}
 
 		return produto
 	}
@@ -67,123 +71,218 @@ export class ProdutoService {
 	}
 
 	async create(produtoDto: CriarProdutoDto, fotoFile?: Express.Multer.File): Promise<Produto> {
-		
+		// Validações
 		await this.validateCategoria(produtoDto.categoria)
 		await this.validateEditora(produtoDto.editora)
 		await this.validateAutores(produtoDto.autores)
 
-		const produto = this.produtoRepository.create(produtoDto)
+		let fotoUrl: string | undefined
 
-		let savedProduto: Produto
+		// Upload da imagem ANTES de salvar no banco
+		if (fotoFile) {
+			const tempId = Date.now()
+
+			try {
+				fotoUrl = await this.imageKitService.handleImage({
+					file: fotoFile,
+					recurso: "produto",
+					identificador: tempId.toString(),
+				})
+
+				if (!fotoUrl) {
+					throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
+				}
+			} catch (error) {
+				this.logger.error(
+					`Falha no upload: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+				)
+				throw new BadRequestException(
+					`${ErrorMessages.IMAGE.UPLOAD_FAILED}: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+				)
+			}
+		}
+
+		// Cria produto com URL da foto
+		const produto = this.produtoRepository.create({
+			...produtoDto,
+			foto: fotoUrl,
+		})
+
 		try {
-			savedProduto = await this.produtoRepository.save(produto)
+			const savedProduto = await this.produtoRepository.save(produto)
+			this.logger.log(`Produto criado: ID ${savedProduto.id}`)
+			return savedProduto
 		} catch (error) {
-			this.logger.error(`[ProdutoService][create] ${ErrorMessages.PRODUTO.CREATE_FAILED} Dados: ${JSON.stringify(produtoDto)}. Erro: ${error instanceof Error ? error.message : error}`)
+			// Rollback: deleta imagem se falhou ao salvar
+			if (fotoUrl) {
+				this.logger.warn(`Deletando imagem órfã: ${fotoUrl}`)
+				try {
+					await this.imageKitService.deleteImageByUrl(fotoUrl)
+				} catch (deleteError) {
+					this.logger.error(
+						`Erro ao deletar imagem órfã: ${deleteError instanceof Error ? deleteError.message : "Erro desconhecido"}`,
+					)
+				}
+			}
+
 			this.handleSaveError(error)
 		}
-
-		if (fotoFile) {
-			await this.processFotoFile(savedProduto, fotoFile)
-		}
-
-		return savedProduto
 	}
 
 	async update(
 		produtoDto: AtualizarProdutoDto,
 		fotoFile?: Express.Multer.File,
 	): Promise<Produto> {
-		
 		const produto = await this.findById(produtoDto.id)
+		const oldFotoUrl = produto.foto
 
+		// Validações
 		await this.validateCategoria(produtoDto.categoria)
 		await this.validateEditora(produtoDto.editora)
 		await this.validateAutores(produtoDto.autores)
 
+		let novaFotoUrl: string | undefined
+
+		// Upload de nova imagem ANTES de atualizar no banco
 		if (fotoFile) {
-			await this.processFotoFile(produto, fotoFile)
-			produtoDto.foto = produto.foto
+			try {
+				novaFotoUrl = await this.imageKitService.processarProdutoImage(
+					produto.id,
+					fotoFile,
+					oldFotoUrl,
+				)
+
+				if (!novaFotoUrl) {
+					throw new BadRequestException(ErrorMessages.IMAGE.UPLOAD_FAILED)
+				}
+			} catch (error) {
+				this.logger.error(
+					`Falha no upload: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+				)
+				throw new BadRequestException(
+					`${ErrorMessages.IMAGE.UPLOAD_FAILED}: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+				)
+			}
 		}
 
-		Object.assign(produto, produtoDto)
+		// Atualiza produto (remove 'foto' do DTO para não sobrescrever com undefined)
+		const dadosParaAtualizar = { ...produtoDto }
+		delete dadosParaAtualizar.foto
 
-		let updatedProduto: Produto
+		Object.assign(produto, {
+			...dadosParaAtualizar,
+			...(novaFotoUrl && { foto: novaFotoUrl }),
+		})
+
 		try {
-			updatedProduto = await this.produtoRepository.save(produto)
+			const updatedProduto = await this.produtoRepository.save(produto)
+			this.logger.log(`Produto atualizado: ID ${updatedProduto.id}`)
+			return updatedProduto
 		} catch (error) {
-			this.logger.error(`[ProdutoService][update] ${ErrorMessages.PRODUTO.UPDATE_FAILED} ID ${produtoDto.id}. Dados: ${JSON.stringify(produtoDto)}. Erro: ${error instanceof Error ? error.message : error}`)
+			// Rollback: deleta nova imagem se falhou ao atualizar
+			if (novaFotoUrl && novaFotoUrl !== oldFotoUrl) {
+				this.logger.warn(`Deletando nova imagem órfã: ${novaFotoUrl}`)
+				try {
+					await this.imageKitService.deleteImageByUrl(novaFotoUrl)
+				} catch (deleteError) {
+					this.logger.error(
+						`Erro ao deletar imagem órfã: ${deleteError instanceof Error ? deleteError.message : "Erro desconhecido"}`,
+					)
+				}
+			}
+
 			this.handleSaveError(error)
 		}
-		return updatedProduto
 	}
 
 	async delete(id: number): Promise<void> {
+		const produto = await this.findById(id)
+
+		// Deleta imagem antes de deletar produto
+		if (produto.foto) {
+			try {
+				await this.imageKitService.deleteImageByUrl(produto.foto)
+			} catch (error) {
+				this.logger.warn(
+					`Erro ao deletar imagem: ${error instanceof Error ? error.message : "Erro desconhecido"}`,
+				)
+				// Continua mesmo se falhar
+			}
+		}
+
 		const resultado = await this.produtoRepository.delete(id)
 
 		if (resultado.affected === 0) {
 			throw new NotFoundException(ErrorMessages.PRODUTO.NOT_FOUND)
 		}
+
+		this.logger.log(`Produto deletado: ID ${id}`)
 	}
 
-	// Métodos Auxiliares
+	// Métodos de validação
 
-	private async validateCategoria(categoria: CategoriaIdDto) {
+	private async validateCategoria(categoria: CategoriaIdDto): Promise<void> {
 		if (!categoria?.id) {
 			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 		}
+
 		const buscaCategoria = await this.categoriaService.findById(categoria.id)
-		if (!buscaCategoria)
-			throw new BadRequestException(`${ErrorMessages.CATEGORIA.NOT_FOUND} (ID ${categoria.id})`)
+		if (!buscaCategoria) {
+			throw new BadRequestException(
+				`${ErrorMessages.CATEGORIA.NOT_FOUND} (ID ${categoria.id})`,
+			)
+		}
 	}
 
-	private async validateEditora(editora: EditoraIdDto) {
+	private async validateEditora(editora: EditoraIdDto): Promise<void> {
 		if (!editora?.id) {
 			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 		}
+
 		const buscaEditora = await this.editoraService.findById(editora.id)
-		if (!buscaEditora) throw new BadRequestException(`${ErrorMessages.EDITORA.NOT_FOUND} (ID ${editora.id})`)
+		if (!buscaEditora) {
+			throw new BadRequestException(`${ErrorMessages.EDITORA.NOT_FOUND} (ID ${editora.id})`)
+		}
 	}
 
-	private async validateAutores(autores: AutorIdDto[]) {
+	private async validateAutores(autores: AutorIdDto[]): Promise<void> {
 		if (!autores || !Array.isArray(autores) || autores.length === 0) {
 			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_DATA)
 		}
-		const ids = autores.map(a => a.id)
-		if (ids.some(id => !id)) {
+
+		const ids = autores.map((a) => a.id)
+		if (ids.some((id) => !id)) {
 			throw new BadRequestException(ErrorMessages.GENERAL.INVALID_ID)
 		}
+
 		const encontrados = await this.autorService.findAllByIds(ids)
 		if (encontrados.length !== ids.length) {
-			const encontradosIds = new Set(encontrados.map(a => a.id))
-			const naoEncontrados = ids.filter(id => !encontradosIds.has(id))
-			throw new BadRequestException(`${ErrorMessages.AUTHOR.NOT_FOUND} (ID(s) ${naoEncontrados.join(', ')})`)
+			const encontradosIds = new Set(encontrados.map((a) => a.id))
+			const naoEncontrados = ids.filter((id) => !encontradosIds.has(id))
+			throw new BadRequestException(
+				`${ErrorMessages.AUTHOR.NOT_FOUND} (ID(s) ${naoEncontrados.join(", ")})`,
+			)
 		}
 	}
 
 	private handleSaveError(error: unknown): never {
 		if (error instanceof QueryFailedError && typeof error.message === "string") {
 			const msg = error.message.toLowerCase()
+
 			if (msg.includes("unique") || msg.includes("constraint")) {
 				if (msg.includes("isbn13")) {
-					throw new BadRequestException(`${ErrorMessages.PRODUTO.ALREADY_EXISTS} (ISBN13)`)
+					throw new BadRequestException(
+						`${ErrorMessages.PRODUTO.ALREADY_EXISTS} (ISBN13)`,
+					)
 				}
 				if (msg.includes("isbn10")) {
-					throw new BadRequestException(`${ErrorMessages.PRODUTO.ALREADY_EXISTS} (ISBN10)`)
+					throw new BadRequestException(
+						`${ErrorMessages.PRODUTO.ALREADY_EXISTS} (ISBN10)`,
+					)
 				}
 			}
 		}
-		throw error
-	}
 
-	private async processFotoFile(produto: Produto, fotoFile: Express.Multer.File) {
-		const fotoUrl = await this.imageKitService.processarProdutoImage(
-			produto.id,
-			fotoFile,
-			produto.foto,
-		)
-		if (fotoUrl) {
-			produto.foto = fotoUrl
-			await this.produtoRepository.save(produto)
-		}
+		throw error
 	}
 }
