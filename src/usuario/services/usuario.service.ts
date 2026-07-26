@@ -11,6 +11,7 @@ import { AtualizarUsuarioDto } from "../dtos/atualizarusuario.dto"
 import { CriarUsuarioDto } from "../dtos/criarusuario.dto"
 import { Usuario } from "../entities/usuario.entity"
 import { isEmail } from "class-validator"
+import { Multer } from 'multer';
 
 @Injectable()
 export class UsuarioService {

@@ -71,7 +71,8 @@ export class SendmailService {
 				this.logger.log(`📧 Tentativa ${attempt}/${retries} de envio de email`);
 				return await this.transporter.sendMail(mailOptions);
 			} catch (error) {
-				this.logger.warn(`⚠️ Tentativa ${attempt} falhou: ${error.message}`);
+				const message = error instanceof Error ? error.message : String(error);
+    		this.logger.warn(`⚠️ Tentativa ${attempt} falhou: ${message}`);
 				
 				if (attempt === retries) {
 					this.logger.error(`❌ Todas as ${retries} tentativas falharam`);

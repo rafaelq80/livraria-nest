@@ -1,8 +1,4 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from "./app.controller";
 import { AutorModule } from './autor/autor.module';
 import { CategoriaModule } from './categoria/categoria.module';
@@ -14,6 +10,10 @@ import { JwtAuthGuard } from './security/guards/jwt-auth.guard';
 import { SecurityModule } from './security/security.module';
 import { SendmailModule } from "./sendmail/sendmail.module";
 import { UsuarioModule } from './usuario/usuario.module';
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
 	imports: [
